@@ -13,7 +13,7 @@ import javafx.stage.Stage;
 
 public class CanvasApp extends Application {
 
-    private static final int CANVAS_WIDTH = 400;
+    private static final int CANVAS_WIDTH = 401;
     private static final int CANVAS_HEIGHT = 400;
     private static final int GRID_SIZE = 16; // This is the size of each square in the grid
 
