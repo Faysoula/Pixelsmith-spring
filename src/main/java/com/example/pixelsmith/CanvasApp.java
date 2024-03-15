@@ -13,20 +13,22 @@ import javafx.stage.Stage;
 
 public class CanvasApp extends Application {
 
-    private static final int CANVAS_WIDTH = 401;
+    private static final int CANVAS_WIDTH = 400;
     private static final int CANVAS_HEIGHT = 400;
     private static final int GRID_SIZE = 16; // This is the size of each square in the grid
+    private GraphicsContext gc; // Declare gc at the class level
+    private ColorPicker colorPicker; // Declare colorPicker at the class level
 
     @Override
     public void start(Stage primaryStage) {
         BorderPane root = new BorderPane();
         Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
-        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc = canvas.getGraphicsContext2D(); // Initialize gc
 
-        drawGrid(gc);
+        drawGrid();
 
-        // Color Picker for selecting pen color
-        ColorPicker colorPicker = new ColorPicker(Color.BLACK);
+        // Initialize colorPicker
+        colorPicker = new ColorPicker(Color.BLACK);
 
         // Toolbar with drawing tools, adding just the pen tool for now
         ToolBar toolBar = new ToolBar();
@@ -37,16 +39,19 @@ public class CanvasApp extends Application {
         root.setLeft(toolBar);
         root.setCenter(canvas);
 
-        Runnable draw = () -> {
-            if(penTool.isSelected()){
-                double x = Math.floor(canvas.getMousePosition().getX() / GRID_SIZE) * GRID_SIZE;
-                double y = Math.floor(canvas.getMousePosition().getY() / GRID_SIZE) * GRID_SIZE;
-                gc.setFill(colorPicker.getValue());
-                gc.fillRect(x,y,GRID_SIZE, GRID_SIZE);
+        // Handle the drawing on canvas on mouse click
+        canvas.setOnMouseClicked(e -> {
+            if (penTool.isSelected()) {
+                draw(e.getX(), e.getY());
             }
-        };
-        canvas.setOnMouseClicked(e->draw.run());
-        canvas.setOnMouseDragged(e->draw.run());
+        });
+
+        // Handle the drawing on canvas on mouse drag
+        canvas.setOnMouseDragged(e -> {
+            if (penTool.isSelected()) {
+                draw(e.getX(), e.getY());
+            }
+        });
 
         // Scene with styling
         Scene scene = new Scene(root, 600, 400);
@@ -55,7 +60,16 @@ public class CanvasApp extends Application {
         primaryStage.show();
     }
 
-    private void drawGrid(GraphicsContext gc) {
+    // Method to handle drawing
+    private void draw(double x, double y) {
+        double adjustedX = Math.floor(x / GRID_SIZE) * GRID_SIZE;
+        double adjustedY = Math.floor(y / GRID_SIZE) * GRID_SIZE;
+        gc.setFill(colorPicker.getValue());
+        gc.fillRect(adjustedX, adjustedY, GRID_SIZE, GRID_SIZE);
+    }
+
+    // Method to draw the grid
+    private void drawGrid() {
         gc.setStroke(Color.LIGHTGRAY);
         gc.setLineWidth(1);
 
