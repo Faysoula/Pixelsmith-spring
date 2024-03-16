@@ -11,6 +11,8 @@ import javafx.scene.control.ToolBar;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class PixelArtEditor extends Application {
 
@@ -22,7 +24,6 @@ public class PixelArtEditor extends Application {
     private final Color[][] pixels = new Color[ROWS][COLS];
     private GraphicsContext gc;
     private ColorPicker colorPicker;
-    private ColorPicker backgroundColorPicker;
     private Tool currentTool;
 
     // Tool interface
@@ -41,41 +42,64 @@ public class PixelArtEditor extends Application {
     // Eraser tool
     class EraserTool implements Tool {
         public void apply(int row, int col) {
-            // Determine the original checkerboard color based on the position
-            Color originalColor = ((row + col) % 2 == 0) ? Color.rgb(160, 160, 160) : Color.rgb(96, 96, 96);
-            pixels[row][col] = originalColor;
+            pixels[row][col] = getCheckerboardColor(row, col);
             renderPixel(row, col);
         }
     }
+
     class FillTool implements Tool {
+        @Override
         public void apply(int row, int col) {
             Color targetColor = pixels[row][col];
-            fill(row, col, targetColor, colorPicker.getValue());
+            Color replacementColor = colorPicker.getValue();
+
+            // Don't fill if the selected color is the same as the target color
+            if (targetColor.equals(replacementColor)) {
+                return;
+            }
+
+            floodFill(row, col, targetColor, replacementColor);
         }
 
-        private void fill(int row, int col, Color targetColor, Color replacementColor) {
-            if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
-            if (!pixels[row][col].equals(targetColor) || pixels[row][col].equals(replacementColor)) return;
+        private void floodFill(int startRow, int startCol, Color targetColor, Color replacementColor) {
+            Queue<int[]> queue = new LinkedList<>();
+            queue.add(new int[]{startRow, startCol});
 
-            pixels[row][col] = replacementColor;
-            renderPixel(row, col);
+            while (!queue.isEmpty()) {
+                int[] position = queue.remove();
+                int row = position[0], col = position[1];
 
-            fill(row - 1, col, targetColor, replacementColor);
-            fill(row + 1, col, targetColor, replacementColor);
-            fill(row, col - 1, targetColor, replacementColor);
-            fill(row, col + 1, targetColor, replacementColor);
+                // Check boundaries and whether to continue filling
+                if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
+                    continue;
+                }
+
+                Color currentColor = pixels[row][col];
+                if (!isFillableColor(currentColor, targetColor, replacementColor)) {
+                    continue;
+                }
+
+                pixels[row][col] = replacementColor;
+                renderPixel(row, col);
+
+                // Add neighboring pixels to the queue
+                queue.add(new int[]{row, col - 1}); // Left
+                queue.add(new int[]{row, col + 1}); // Right
+                queue.add(new int[]{row - 1, col}); // Above
+                queue.add(new int[]{row + 1, col}); // Below
+            }
+        }
+
+        private boolean isFillableColor(Color currentColor, Color targetColor, Color replacementColor) {
+            // Check if the current color is either the target color or part of the checkerboard pattern
+            return currentColor.equals(targetColor) || currentColor.equals(getCheckerboardColor(0, 0)) || currentColor.equals(getCheckerboardColor(0, 1));
         }
     }
-
-    // Initialize the grid with the default color
+    // Initialize the grid with a checkerboard pattern
     private void initializeGrid() {
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
-                if ((row + col) % 2 == 0) {
-                    pixels[row][col] = Color.rgb(160, 160, 160); // Light check
-                } else {
-                    pixels[row][col] = Color.rgb(96, 96, 96); // Dark check
-                }
+                pixels[row][col] = getCheckerboardColor(row, col);
             }
         }
     }
@@ -91,11 +115,16 @@ public class PixelArtEditor extends Application {
 
     // Render a single pixel
     private void renderPixel(int row, int col) {
-        if (pixels[row][col] == Color.TRANSPARENT) {
-            gc.clearRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+        gc.setFill(pixels[row][col]);
+        gc.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+    }
+
+    // Determine the checkerboard pattern color based on the position
+    private Color getCheckerboardColor(int row, int col) {
+        if ((row + col) % 2 == 0) {
+            return Color.rgb(160, 160, 160); // Light check
         } else {
-            gc.setFill(pixels[row][col]);
-            gc.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+            return Color.rgb(96, 96, 96); // Dark check
         }
     }
 
@@ -107,9 +136,8 @@ public class PixelArtEditor extends Application {
         gc = canvas.getGraphicsContext2D();
         renderGrid();
 
-        // Initialize color pickers
+        // Initialize color picker
         colorPicker = new ColorPicker(Color.BLACK);
-        backgroundColorPicker = new ColorPicker(Color.TRANSPARENT);
 
         // Initialize toolbar and tools
         ToolBar toolBar = new ToolBar();
@@ -117,17 +145,20 @@ public class PixelArtEditor extends Application {
 
         ToggleButton penToolButton = new ToggleButton("Pen");
         ToggleButton eraserToolButton = new ToggleButton("Eraser");
+        ToggleButton fillToolButton = new ToggleButton("Fill");
 
         penToolButton.setToggleGroup(toolsGroup);
         eraserToolButton.setToggleGroup(toolsGroup);
+        fillToolButton.setToggleGroup(toolsGroup);
 
         penToolButton.setSelected(true); // Pen tool is selected by default
         currentTool = new PenTool(); // Default tool
 
         penToolButton.setOnAction(e -> currentTool = new PenTool());
         eraserToolButton.setOnAction(e -> currentTool = new EraserTool());
+        fillToolButton.setOnAction(e -> currentTool = new FillTool());
 
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, colorPicker, backgroundColorPicker);
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, colorPicker);
 
         // Add the toolbar on the left and canvas in the center
         root.setLeft(toolBar);
@@ -138,7 +169,7 @@ public class PixelArtEditor extends Application {
         canvas.setOnMouseDragged(e -> applyTool(e.getX(), e.getY()));
 
         // Scene with styling
-        Scene scene = new Scene(root, 600, 450);
+        Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
         primaryStage.show();
