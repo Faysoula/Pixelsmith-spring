@@ -1,7 +1,6 @@
 package com.example.pixelsmith;
 
 import javafx.application.Application;
-import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -25,8 +24,7 @@ public class PixelArtEditor extends Application {
     private ColorPicker colorPicker;
     private Tool currentTool;
 
-    private int penSize = 1;
-    private int eraserSize = 1;
+    private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
     // Tool interface
     interface Tool {
@@ -69,14 +67,13 @@ public class PixelArtEditor extends Application {
 
         // Finish drawing the square
         public void onMouseReleased(int row, int col) {
-            int endX = col;
-            int endY = row;
+
 
             // Calculate the square's boundaries
-            int minX = Math.min(startX, endX);
-            int maxX = Math.max(startX, endX);
-            int minY = Math.min(startY, endY);
-            int maxY = Math.max(startY, endY);
+            int minX = Math.min(startX, col);
+            int maxX = Math.max(startX, col);
+            int minY = Math.min(startY, row);
+            int maxY = Math.max(startY, row);
 
             // Draw the square
             for (int r = minY; r <= maxY; r++) {
@@ -138,7 +135,7 @@ public class PixelArtEditor extends Application {
                 }
 
                 Color currentColor = pixels[row][col];
-                if (!isFillableColor(currentColor, targetColor, replacementColor)) {
+                if (!isFillableColor(currentColor, targetColor)) {
                     continue;
                 }
 
@@ -153,7 +150,7 @@ public class PixelArtEditor extends Application {
             }
         }
 
-        private boolean isFillableColor(Color currentColor, Color targetColor, Color replacementColor) {
+        private boolean isFillableColor(Color currentColor, Color targetColor) {
             // Check if the current color is either the target color or part of the checkerboard pattern
             return currentColor.equals(targetColor) || currentColor.equals(getCheckerboardColor(0, 0)) || currentColor.equals(getCheckerboardColor(0, 1));
         }
@@ -236,7 +233,7 @@ public class PixelArtEditor extends Application {
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,squareToolButton, colorPicker);
 
         // Add the toolbar on the left and canvas in the center
-        root.setLeft(toolBar);
+        root.setTop(toolBar);
         root.setCenter(canvas);
 
         // Handle the drawing on canvas
@@ -267,29 +264,27 @@ public class PixelArtEditor extends Application {
             Optional<String> result = dialog.showAndWait();
             result.ifPresent(this::createNewSpriteEditor);
         });
-        Slider penSizeSlider = new Slider(1, GRID_SIZE, 1);
-        penSizeSlider.setOrientation(Orientation.HORIZONTAL);
-        penSizeSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
-            penSize = newValue.intValue();
-            if (currentTool instanceof PenTool) {
-                currentTool.setToolSize(penSize);
+
+        Slider sizeSlider = new Slider(0, toolSizes.length - 1, 0);
+        sizeSlider.setMajorTickUnit(1);
+        sizeSlider.setSnapToTicks(true);
+        sizeSlider.setShowTickLabels(true);
+        sizeSlider.setShowTickMarks(true);
+        sizeSlider.setMinorTickCount(0);
+        sizeSlider.setBlockIncrement(1);
+
+        sizeSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
+            int sizeIndex = newValue.intValue();
+            int selectedSize = toolSizes[sizeIndex];
+            if (currentTool instanceof PenTool || currentTool instanceof EraserTool) {
+                currentTool.setToolSize(selectedSize);
             }
         });
 
-        Slider eraserSizeSlider = new Slider(1, GRID_SIZE, 1);
-        eraserSizeSlider.setOrientation(Orientation.HORIZONTAL);
-        eraserSizeSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
-            eraserSize = newValue.intValue();
-            if (currentTool instanceof EraserTool) {
-                currentTool.setToolSize(eraserSize);
-            }
-        });
-
-        Label penSizeLabel = new Label("Pen Size:");
-        Label eraserSizeLabel = new Label("Eraser Size:");
+        Label sizeLabel = new Label("Tool Size:");
 
         // Add size controls to the toolbar
-        toolBar.getItems().addAll(penSizeLabel, penSizeSlider, eraserSizeLabel, eraserSizeSlider);
+        toolBar.getItems().addAll(sizeLabel, sizeSlider);
 
         // Add Create Sprite button to the toolBar
         toolBar.getItems().add(createSpriteButton);
