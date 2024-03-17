@@ -69,7 +69,7 @@ public class SignUpApp extends Application {
 
 // Add a title label that spans two columns
         Label titleLabel = new Label("PIXEL SMITH");
-        GridPane.setHalignment(titleLabel, HPos.CENTER); // To center the labe
+        GridPane.setHalignment(titleLabel, HPos.CENTER); // To center the label
 
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);

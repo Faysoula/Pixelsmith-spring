@@ -5,17 +5,22 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+
+import java.io.File;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
 
 public class PixelArtEditor extends Application {
 
-    private static final int CANVAS_WIDTH = 800;
-    private static final int CANVAS_HEIGHT = 800;
+    private static final int CANVAS_WIDTH = 500;
+    private static final int CANVAS_HEIGHT = 500;
     private static final int GRID_SIZE = 16;
     private static final int ROWS = CANVAS_HEIGHT / GRID_SIZE;
     private static final int COLS = CANVAS_WIDTH / GRID_SIZE;
@@ -195,7 +200,6 @@ public class PixelArtEditor extends Application {
         PixelArtEditor editor = new PixelArtEditor(); // Create a new instance of the editor
         editor.start(newSpriteStage); // Start the new editor on a new stage
     }
-
     @Override
     public void start(Stage primaryStage) {
         initializeGrid();
@@ -281,16 +285,15 @@ public class PixelArtEditor extends Application {
             }
         });
 
-        Label sizeLabel = new Label("Tool Size:");
-
         // Add size controls to the toolbar
-        toolBar.getItems().addAll(sizeLabel, sizeSlider);
+
 
         // Add Create Sprite button to the toolBar
         toolBar.getItems().add(createSpriteButton);
 
         // Scene with styling
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
+        scene.getStylesheets().add("dark-theme.css");
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
         primaryStage.show();
