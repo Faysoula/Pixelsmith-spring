@@ -7,27 +7,31 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
+import javafx.scene.transform.Affine;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
 
 public class PixelArtEditor extends Application {
-
-    private static final int CANVAS_WIDTH = 500;
-    private static final int CANVAS_HEIGHT = 500;
+    private static final int CANVAS_WIDTH = 950;
+    private static final int CANVAS_HEIGHT = 950;
     private static final int GRID_SIZE = 16;
+    private static final double ZOOM_FACTOR = 1.1;
     private static final int ROWS = CANVAS_HEIGHT / GRID_SIZE;
     private static final int COLS = CANVAS_WIDTH / GRID_SIZE;
     private final Color[][] pixels = new Color[ROWS][COLS];
     private GraphicsContext gc;
     private ColorPicker colorPicker;
     private Tool currentTool;
+    private double scale = 1.0;
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
@@ -200,6 +204,40 @@ public class PixelArtEditor extends Application {
         PixelArtEditor editor = new PixelArtEditor(); // Create a new instance of the editor
         editor.start(newSpriteStage); // Start the new editor on a new stage
     }
+
+    private void loadAndDisplaySpriteSheet(File file) {
+        try {
+            // Load the sprite sheet with no scaling or smoothing
+            Image spriteSheet = new Image(new FileInputStream(file), CANVAS_WIDTH, CANVAS_HEIGHT, false, false);
+            PixelReader pixelReader = spriteSheet.getPixelReader();
+
+            // Determine the size of the sprite sheet in terms of the grid
+            int spriteSheetRows = (int) spriteSheet.getHeight() / GRID_SIZE;
+            int spriteSheetCols = (int) spriteSheet.getWidth() / GRID_SIZE;
+
+            // Update the pixel array based on the loaded image
+            for (int row = 0; row < spriteSheetRows; row++) {
+                for (int col = 0; col < spriteSheetCols; col++) {
+                    // Read the color of the pixel
+                    Color color = pixelReader.getColor(col * GRID_SIZE, row * GRID_SIZE);
+
+                    // Translate sprite sheet pixel position to canvas grid position
+                    int canvasRow = row % ROWS;
+                    int canvasCol = col % COLS;
+
+                    // Update the pixels array with the color from the sprite sheet
+                    pixels[canvasRow][canvasCol] = color;
+                    renderPixel(canvasRow, canvasCol);
+                }
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     @Override
     public void start(Stage primaryStage) {
         initializeGrid();
@@ -285,8 +323,27 @@ public class PixelArtEditor extends Application {
             }
         });
 
-        // Add size controls to the toolbar
+        Label sizeLabel = new Label("Tool Size:");
 
+
+        // Add size controls to the toolbar
+        toolBar.getItems().addAll(sizeLabel, sizeSlider);
+        Button importSpriteButton = new Button("Import Sprite Sheet");
+        importSpriteButton.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Open Sprite Sheet");
+            fileChooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.gif")
+            );
+            File selectedFile = fileChooser.showOpenDialog(primaryStage);
+            if (selectedFile != null) {
+                loadAndDisplaySpriteSheet(selectedFile);
+            }
+        });
+
+
+// Add the button to the toolbar
+        toolBar.getItems().add(importSpriteButton);
 
         // Add Create Sprite button to the toolBar
         toolBar.getItems().add(createSpriteButton);
