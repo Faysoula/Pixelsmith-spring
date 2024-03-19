@@ -7,10 +7,9 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
-import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
-import javafx.scene.transform.Affine;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.io.File;
@@ -21,29 +20,31 @@ import java.util.Optional;
 import java.util.Queue;
 
 public class PixelArtEditor extends Application {
-    private static final int CANVAS_WIDTH = 950;
-    private static final int CANVAS_HEIGHT = 950;
+    private static int CANVAS_WIDTH = 2000;
+    private static int CANVAS_HEIGHT = 2000;
     private static final int GRID_SIZE = 16;
-    private static final double ZOOM_FACTOR = 1.1;
-    private static final int ROWS = CANVAS_HEIGHT / GRID_SIZE;
-    private static final int COLS = CANVAS_WIDTH / GRID_SIZE;
-    private final Color[][] pixels = new Color[ROWS][COLS];
+    private static int ROWS = CANVAS_HEIGHT / GRID_SIZE;
+    private static int COLS = CANVAS_WIDTH / GRID_SIZE;
+    private Color[][] pixels = new Color[ROWS][COLS];
     private GraphicsContext gc;
     private ColorPicker colorPicker;
     private Tool currentTool;
-    private double scale = 1.0;
+    //private double scale = 1.0;
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
     // Tool interface
     interface Tool {
         void apply(int row, int col);
-        default void setToolSize(int size){}
+
+        default void setToolSize(int size) {
+        }
     }
 
     // Pen tool
     class PenTool implements Tool {
         private int size = 1;
+
         public void apply(int row, int col) {
             for (int r = row - size + 1; r < row + size; r++) {
                 for (int c = col - size + 1; c < col + size; c++) {
@@ -54,6 +55,7 @@ public class PixelArtEditor extends Application {
                 }
             }
         }
+
         public void setToolSize(int size) {
             this.size = size;
         }
@@ -164,6 +166,7 @@ public class PixelArtEditor extends Application {
             return currentColor.equals(targetColor) || currentColor.equals(getCheckerboardColor(0, 0)) || currentColor.equals(getCheckerboardColor(0, 1));
         }
     }
+
     // Initialize the grid with a checkerboard pattern
     private void initializeGrid() {
         for (int row = 0; row < ROWS; row++) {
@@ -208,36 +211,39 @@ public class PixelArtEditor extends Application {
     private void loadAndDisplaySpriteSheet(File file) {
         try {
             // Load the sprite sheet with no scaling or smoothing
-            Image spriteSheet = new Image(new FileInputStream(file), CANVAS_WIDTH, CANVAS_HEIGHT, false, false);
+            Image spriteSheet = new Image(new FileInputStream(file));
             PixelReader pixelReader = spriteSheet.getPixelReader();
 
             // Determine the size of the sprite sheet in terms of the grid
-            int spriteSheetRows = (int) spriteSheet.getHeight() / GRID_SIZE;
-            int spriteSheetCols = (int) spriteSheet.getWidth() / GRID_SIZE;
+            int spriteSheetRows = (int) spriteSheet.getHeight();
+            int spriteSheetCols = (int) spriteSheet.getWidth();
+
+            // Resize the canvas and pixel array to match the sprite sheet size
+            CANVAS_WIDTH = spriteSheetCols;
+            CANVAS_HEIGHT = spriteSheetRows;
+            ROWS = CANVAS_HEIGHT;
+            COLS = CANVAS_WIDTH;
+            pixels = new Color[ROWS][COLS];
 
             // Update the pixel array based on the loaded image
             for (int row = 0; row < spriteSheetRows; row++) {
                 for (int col = 0; col < spriteSheetCols; col++) {
                     // Read the color of the pixel
-                    Color color = pixelReader.getColor(col * GRID_SIZE, row * GRID_SIZE);
-
-                    // Translate sprite sheet pixel position to canvas grid position
-                    int canvasRow = row % ROWS;
-                    int canvasCol = col % COLS;
+                    Color color = pixelReader.getColor(col, row);
 
                     // Update the pixels array with the color from the sprite sheet
-                    pixels[canvasRow][canvasCol] = color;
-                    renderPixel(canvasRow, canvasCol);
+                    pixels[row][col] = color;
+                    renderPixel(row, col);
                 }
             }
 
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            System.out.println("error loading the sprite file :(");
 
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
+
+
     @Override
     public void start(Stage primaryStage) {
         initializeGrid();
@@ -248,6 +254,7 @@ public class PixelArtEditor extends Application {
 
         // Initialize color picker
         colorPicker = new ColorPicker(Color.BLACK);
+
 
         // Initialize toolbar and tools
         ToolBar toolBar = new ToolBar();
@@ -271,11 +278,9 @@ public class PixelArtEditor extends Application {
         penToolButton.setOnAction(e -> currentTool = new PenTool());
         eraserToolButton.setOnAction(e -> currentTool = new EraserTool());
         fillToolButton.setOnAction(e -> currentTool = new FillTool());
-        squareToolButton.setOnAction(e-> currentTool = squareTool);
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,squareToolButton, colorPicker);
+        squareToolButton.setOnAction(e -> currentTool = squareTool);
 
         // Add the toolbar on the left and canvas in the center
-        root.setTop(toolBar);
         root.setCenter(canvas);
 
         // Handle the drawing on canvas
@@ -325,9 +330,8 @@ public class PixelArtEditor extends Application {
 
         Label sizeLabel = new Label("Tool Size:");
 
-
         // Add size controls to the toolbar
-        toolBar.getItems().addAll(sizeLabel, sizeSlider);
+
         Button importSpriteButton = new Button("Import Sprite Sheet");
         importSpriteButton.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
@@ -341,18 +345,75 @@ public class PixelArtEditor extends Application {
             }
         });
 
+        canvas.setOnScroll(event -> {
+            double zoomFactor = 1.05;
+            double deltaY = event.getDeltaY();
 
-// Add the button to the toolbar
-        toolBar.getItems().add(importSpriteButton);
+            if (deltaY < 0) {
+                zoomFactor = 1 / zoomFactor;
+            }
 
-        // Add Create Sprite button to the toolBar
-        toolBar.getItems().add(createSpriteButton);
+            canvas.setScaleX(canvas.getScaleX() * zoomFactor);
+            canvas.setScaleY(canvas.getScaleY() * zoomFactor);
 
-        // Scene with styling
+            // Adjust the position of the canvas to center the zoom on the cursor
+            double mouseX = event.getX();
+            double mouseY = event.getY();
+
+            double adjustX = (zoomFactor - 1) * (canvas.getTranslateX() - mouseX);
+            double adjustY = (zoomFactor - 1) * (canvas.getTranslateY() - mouseY);
+
+            canvas.setTranslateX(canvas.getTranslateX() - adjustX);
+            canvas.setTranslateY(canvas.getTranslateY() - adjustY);
+
+            event.consume();
+        });
+
+
+
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, squareToolButton,createSpriteButton,
+                                importSpriteButton,colorPicker,sizeLabel, sizeSlider);
+        root.setTop(toolBar);
+
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
+        final double[] lastKnownPosition = new double[2];
+
+        canvas.setOnMousePressed(e -> {
+            if (e.isSecondaryButtonDown()) {
+                // Record the last position when the right mouse button is pressed
+                lastKnownPosition[0] = e.getSceneX();
+                lastKnownPosition[1] = e.getSceneY();
+            } else if (currentTool instanceof SquareTool) {
+                // Your existing tool logic
+                squareTool.onMousePressed((int) e.getY() / GRID_SIZE, (int) e.getX() / GRID_SIZE);
+            } else {
+                applyTool(e.getX(), e.getY());
+            }
+        });
+
+        canvas.setOnMouseDragged(e -> {
+            if (e.isSecondaryButtonDown()) {
+                // Calculate the change in mouse position
+                double deltaX = e.getSceneX() - lastKnownPosition[0];
+                double deltaY = e.getSceneY() - lastKnownPosition[1];
+
+                // Update the last position to the new position
+                lastKnownPosition[0] = e.getSceneX();
+                lastKnownPosition[1] = e.getSceneY();
+
+                // Apply the translation to the canvas
+                canvas.setTranslateX(canvas.getTranslateX() + deltaX);
+                canvas.setTranslateY(canvas.getTranslateY() + deltaY);
+            } else {
+                applyTool(e.getX(), e.getY());
+            }
+        });
+
         scene.getStylesheets().add("dark-theme.css");
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
+        primaryStage.setWidth(1366);
+        primaryStage.setHeight(768);
         primaryStage.show();
     }
 
