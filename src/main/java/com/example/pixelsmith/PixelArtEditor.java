@@ -73,6 +73,51 @@ public class PixelArtEditor extends Application {
         }
     }
 
+    class LineTool implements Tool {
+        private int startX = -1, startY = -1;
+
+        @Override
+        public void apply(int row, int col) {
+            if (startX == -1 && startY == -1) {
+                // First click - set start position
+                startX = col;
+                startY = row;
+            } else {
+                // Second click - draw line and reset
+                drawLine(startX, startY, col, row);
+                startX = -1;
+                startY = -1;
+            }
+        }
+
+        private void drawLine(int x0, int y0, int x1, int y1) {
+            // Bresenham's line algorithm
+            int dx = Math.abs(x1 - x0);
+            int dy = -Math.abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx + dy, e2;
+
+            while (true) {
+                if (x0 >= 0 && x0 < COLS && y0 >= 0 && y0 < ROWS) {
+                    pixels[y0][x0] = colorPicker.getValue();
+                    renderPixel(y0, x0);
+                }
+                if (x0 == x1 && y0 == y1) break;
+                e2 = 2 * err;
+                if (e2 >= dy) {
+                    err += dy;
+                    x0 += sx;
+                }
+                if (e2 <= dx) {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+    }
+
+
     //square tool
     class SquareTool implements Tool {
         private int startX, startY; // Starting coordinates
@@ -101,9 +146,11 @@ public class PixelArtEditor extends Application {
             // Draw the square
             for (int r = minY; r <= maxY; r++) {
                 for (int c = minX; c <= maxX; c++) {
-                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-                        pixels[r][c] = colorPicker.getValue();
-                        renderPixel(r, c);
+                    if (r == minY || r == maxY || c == minX || c == maxX) {
+                        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                            pixels[r][c] = colorPicker.getValue();
+                            renderPixel(r, c);
+                        }
                     }
                 }
             }
@@ -300,6 +347,8 @@ public class PixelArtEditor extends Application {
         renderGrid();
     }
 
+
+
     @Override
     public void start(Stage primaryStage) {
         initializeGrid();
@@ -344,7 +393,7 @@ public class PixelArtEditor extends Application {
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isSecondaryButtonDown()) {
+            } else if (e.isShiftDown()) {
                 currentTool = new EraserTool();
                 applyTool(e.getX(), e.getY());
                 currentTool = previousTool;
@@ -354,7 +403,7 @@ public class PixelArtEditor extends Application {
         canvas.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isSecondaryButtonDown()) {
+            } else if (e.isShiftDown()) {
                 currentTool = new EraserTool();
                 applyTool(e.getX(), e.getY());
                 currentTool = previousTool;
@@ -459,10 +508,15 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
+        //clear canvas button
         Button clearButton = new Button("Clear Canvas");
         clearButton.setOnAction(e -> clearCanvas());
 
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,eyeDropperToolButton, squareToolButton, createSpriteButton,
+        ToggleButton lineToolButton = new ToggleButton("Line");
+        lineToolButton.setToggleGroup(toolsGroup);
+        lineToolButton.setOnAction(e -> currentTool = new LineTool());
+
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,eyeDropperToolButton, squareToolButton,lineToolButton, createSpriteButton,
                 importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton, clearButton);
         root.setTop(toolBar);
 
