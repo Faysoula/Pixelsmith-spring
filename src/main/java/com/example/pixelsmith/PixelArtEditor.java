@@ -3,7 +3,6 @@ package com.example.pixelsmith;
 import javafx.application.Application;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -65,6 +64,12 @@ public class PixelArtEditor extends Application {
 
         public void setToolSize(int size) {
             this.size = size;
+        }
+    }
+
+    class EyeDropperTool implements Tool {
+        public void apply(int row, int col) {
+            colorPicker.setValue(pixels[row][col]);
         }
     }
 
@@ -444,9 +449,13 @@ public class PixelArtEditor extends Application {
             }
         });
 
+        //eyedropper tool
+        ToggleButton eyeDropperToolButton = new ToggleButton("Eye Dropper");
+        eyeDropperToolButton.setToggleGroup(toolsGroup);
+        eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, squareToolButton,createSpriteButton,
-                                importSpriteButton,colorPicker,sizeLabel, sizeSlider, exportButton);
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,eyeDropperToolButton, squareToolButton, createSpriteButton,
+                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
