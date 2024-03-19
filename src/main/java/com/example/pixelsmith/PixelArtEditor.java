@@ -284,15 +284,25 @@ public class PixelArtEditor extends Application {
         // Add the toolbar on the left and canvas in the center
         root.setCenter(canvas);
 
-        // Handle the drawing on canvas
+        Tool previousTool = currentTool; // Keep track of the previous tool
+
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
+            } else if (e.isSecondaryButtonDown()) {
+                currentTool = new EraserTool();
+                applyTool(e.getX(), e.getY());
+                currentTool = previousTool;
             }
         });
+
         canvas.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
+            } else if (e.isSecondaryButtonDown()) {
+                currentTool = new EraserTool();
+                applyTool(e.getX(), e.getY());
+                currentTool = previousTool;
             }
         });
 
