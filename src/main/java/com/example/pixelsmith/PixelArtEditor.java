@@ -253,7 +253,6 @@ public class PixelArtEditor extends Application {
 
         } catch (FileNotFoundException e) {
             System.out.println("error loading the sprite file :(");
-
         }
     }
 
@@ -294,6 +293,11 @@ public class PixelArtEditor extends Application {
         }
 
         return null;
+    }
+
+    private void clearCanvas(){
+        initializeGrid();
+        renderGrid();
     }
 
     @Override
@@ -411,6 +415,7 @@ public class PixelArtEditor extends Application {
             );
             File selectedFile = fileChooser.showOpenDialog(primaryStage);
             if (selectedFile != null) {
+                clearCanvas();
                 loadAndDisplaySpriteSheet(selectedFile);
             }
         });
@@ -454,8 +459,11 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
+        Button clearButton = new Button("Clear Canvas");
+        clearButton.setOnAction(e -> clearCanvas());
+
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,eyeDropperToolButton, squareToolButton, createSpriteButton,
-                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton);
+                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton, clearButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
