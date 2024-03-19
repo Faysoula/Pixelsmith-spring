@@ -1,22 +1,30 @@
 package com.example.pixelsmith;
 
 import javafx.application.Application;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+
+import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
+
 
 public class PixelArtEditor extends Application {
     private static int CANVAS_WIDTH = 2000;
@@ -244,6 +252,44 @@ public class PixelArtEditor extends Application {
         }
     }
 
+    private Image renderSpriteSheet() {
+        WritableImage spriteSheet = new WritableImage(COLS, ROWS);
+        PixelWriter pixelWriter = spriteSheet.getPixelWriter();
+
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
+                Color pixelColor = pixels[row][col];
+                // If the pixel color matches the checkerboard color, write black color
+                if (pixelColor.equals(getCheckerboardColor(row, col))) {
+                    pixelWriter.setColor(col, row, Color.TRANSPARENT);
+                } else {
+                    pixelWriter.setColor(col, row, pixelColor);
+                }
+            }
+        }
+
+        return spriteSheet;
+    }
+
+    private String saveSpriteSheet(Image spriteSheet, Stage primaryStage) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Sprite Sheet");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("PNG Files", "*.png")
+        );
+        File file = fileChooser.showSaveDialog(primaryStage);
+
+        if (file != null) {
+            try {
+                ImageIO.write(SwingFXUtils.fromFXImage(spriteSheet, null), "png", file);
+                return file.getAbsolutePath(); // Return the saved file path
+            } catch (IOException e) {
+                System.out.println("Error saving the sprite sheet :(");
+            }
+        }
+
+        return null;
+    }
 
     @Override
     public void start(Stage primaryStage) {
@@ -347,9 +393,9 @@ public class PixelArtEditor extends Application {
             }
         });
 
+        // Add size controls to the toolbar
         Label sizeLabel = new Label("Tool Size:");
 
-        // Add size controls to the toolbar
 
         Button importSpriteButton = new Button("Import Sprite Sheet");
         importSpriteButton.setOnAction(e -> {
@@ -388,10 +434,19 @@ public class PixelArtEditor extends Application {
             event.consume();
         });
 
+        Button exportButton = new Button("Export Sprite Sheet");
+        exportButton.setOnAction(e -> {
+            Image spriteSheet = renderSpriteSheet();
+            String savedPath = saveSpriteSheet(spriteSheet, primaryStage);
+            if (savedPath != null) {
+                System.out.println("Saved Sprite Sheet at: " + savedPath);
+                // 'savedPath' in a variable for further use
+            }
+        });
 
 
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, squareToolButton,createSpriteButton,
-                                importSpriteButton,colorPicker,sizeLabel, sizeSlider);
+                                importSpriteButton,colorPicker,sizeLabel, sizeSlider, exportButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
