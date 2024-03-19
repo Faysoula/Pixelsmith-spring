@@ -8,7 +8,6 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -204,7 +203,9 @@ public class PixelArtEditor extends Application {
         Stage newSpriteStage = new Stage();
         newSpriteStage.setTitle(spriteName);
 
-        PixelArtEditor editor = new PixelArtEditor(); // Create a new instance of the editor
+        PixelArtEditor editor = new PixelArtEditor();
+        CANVAS_HEIGHT = 2000;
+        CANVAS_WIDTH = 2000;
         editor.start(newSpriteStage); // Start the new editor on a new stage
     }
 
@@ -284,8 +285,16 @@ public class PixelArtEditor extends Application {
         root.setCenter(canvas);
 
         // Handle the drawing on canvas
-        canvas.setOnMouseClicked(e -> applyTool(e.getX(), e.getY()));
-        canvas.setOnMouseDragged(e -> applyTool(e.getX(), e.getY()));
+        canvas.setOnMouseClicked(e -> {
+            if (e.isPrimaryButtonDown()) {
+                applyTool(e.getX(), e.getY());
+            }
+        });
+        canvas.setOnMouseDragged(e -> {
+            if (e.isPrimaryButtonDown()) {
+                applyTool(e.getX(), e.getY());
+            }
+        });
 
         canvas.setOnMousePressed(e -> {
             if (currentTool instanceof SquareTool) {
