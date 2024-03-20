@@ -6,7 +6,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import java.sql.Connection;
@@ -23,6 +25,7 @@ public class SignUpApp extends Application {
     @Override
     public void start(Stage primaryStage) {
 
+
         // Create the username, email and password fields
         TextField usernameField = new TextField();
         usernameField.setPromptText("USERNAME");
@@ -31,12 +34,36 @@ public class SignUpApp extends Application {
         PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("PASSWORD");
 
+
+
+        emailField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("^[\\w-]+(\\.[\\w-]+)*@[\\w-]+(\\.[\\w-]+)*(\\.[a-zA-Z]{2,})$")) {
+                emailField.setStyle("-fx-border-color: red ; -fx-border-width: 2px ;");
+            } else {
+                emailField.setStyle("");
+            }
+        });
+
+
+        Button loginButton = new Button("Already a PixelSmith?");
+        loginButton.setOnAction(e -> openLoginWindow());
+        loginButton.getStyleClass().add("button");
+
         // Create the sign-up button
         Button signUpButton = new Button("DIVE IN");
         signUpButton.setOnAction(e -> {
             String username = usernameField.getText();
             String email = emailField.getText();
             String password = passwordField.getText();
+
+            String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+
+            // Check if the email is valid
+            if (!email.matches(emailRegex)) {
+                showAlert(Alert.AlertType.ERROR, "Invalid Email", "Please enter a valid email address.");
+                return;
+            }
+
 
             // Hash the password
             String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
@@ -49,7 +76,8 @@ public class SignUpApp extends Application {
                     pstmt.setString(2, email);
                     pstmt.setString(3, hashedPassword);
                     pstmt.executeUpdate();
-                    showAlert(Alert.AlertType.INFORMATION, "Sign Up Successful!", "User has been registered.");
+                    openLoginWindow();
+                    primaryStage.close();
                 } catch (SQLException ex) {
                     showAlert(Alert.AlertType.ERROR, "Database Error", ex.getMessage());
                 }
@@ -58,15 +86,17 @@ public class SignUpApp extends Application {
             }
         });
 
-
+        HBox buttonLayout = new HBox(10); // Adjust spacing as needed
+        buttonLayout.setAlignment(Pos.CENTER);
+        buttonLayout.getChildren().addAll(signUpButton, loginButton);
 
         VBox formLayout = new VBox(10); // Adjust the spacing if needed
         formLayout.setAlignment(Pos.CENTER);
-        formLayout.getChildren().addAll(usernameField, emailField, passwordField);
+        formLayout.getChildren().addAll(usernameField, emailField, passwordField,buttonLayout);
 
 // Add a title label that spans two columns
         Label titleLabel = new Label("PIXEL SMITH");
-        GridPane.setHalignment(titleLabel, HPos.CENTER); // To center the label
+        GridPane.setHalignment(titleLabel, HPos.CENTER);
 
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);
@@ -83,7 +113,6 @@ public class SignUpApp extends Application {
         emailField.getStyleClass().add("text-field");
         passwordField.getStyleClass().add("text-field");
         signUpButton.getStyleClass().add("button");
-
 
 // Set the scene with the CSS file
         Scene scene = new Scene(grid, 300, 275);
@@ -102,6 +131,10 @@ public class SignUpApp extends Application {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+
+    private void openLoginWindow() {
+        new Login().start(new Stage());
     }
 
     public static void main(String[] args) {

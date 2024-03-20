@@ -73,51 +73,6 @@ public class PixelArtEditor extends Application {
         }
     }
 
-    class LineTool implements Tool {
-        private int startX = -1, startY = -1;
-
-        @Override
-        public void apply(int row, int col) {
-            if (startX == -1 && startY == -1) {
-                // First click - set start position
-                startX = col;
-                startY = row;
-            } else {
-                // Second click - draw line and reset
-                drawLine(startX, startY, col, row);
-                startX = -1;
-                startY = -1;
-            }
-        }
-
-        private void drawLine(int x0, int y0, int x1, int y1) {
-            // Bresenham's line algorithm
-            int dx = Math.abs(x1 - x0);
-            int dy = -Math.abs(y1 - y0);
-            int sx = x0 < x1 ? 1 : -1;
-            int sy = y0 < y1 ? 1 : -1;
-            int err = dx + dy, e2;
-
-            while (true) {
-                if (x0 >= 0 && x0 < COLS && y0 >= 0 && y0 < ROWS) {
-                    pixels[y0][x0] = colorPicker.getValue();
-                    renderPixel(y0, x0);
-                }
-                if (x0 == x1 && y0 == y1) break;
-                e2 = 2 * err;
-                if (e2 >= dy) {
-                    err += dy;
-                    x0 += sx;
-                }
-                if (e2 <= dx) {
-                    err += dx;
-                    y0 += sy;
-                }
-            }
-        }
-    }
-
-
     //square tool
     class SquareTool implements Tool {
         private int startX, startY; // Starting coordinates
@@ -146,11 +101,9 @@ public class PixelArtEditor extends Application {
             // Draw the square
             for (int r = minY; r <= maxY; r++) {
                 for (int c = minX; c <= maxX; c++) {
-                    if (r == minY || r == maxY || c == minX || c == maxX) {
-                        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-                            pixels[r][c] = colorPicker.getValue();
-                            renderPixel(r, c);
-                        }
+                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                        pixels[r][c] = colorPicker.getValue();
+                        renderPixel(r, c);
                     }
                 }
             }
@@ -342,13 +295,6 @@ public class PixelArtEditor extends Application {
         return null;
     }
 
-    private void clearCanvas(){
-        initializeGrid();
-        renderGrid();
-    }
-
-
-
     @Override
     public void start(Stage primaryStage) {
         initializeGrid();
@@ -393,7 +339,7 @@ public class PixelArtEditor extends Application {
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isShiftDown()) {
+            } else if (e.isSecondaryButtonDown()) {
                 currentTool = new EraserTool();
                 applyTool(e.getX(), e.getY());
                 currentTool = previousTool;
@@ -403,7 +349,7 @@ public class PixelArtEditor extends Application {
         canvas.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isShiftDown()) {
+            } else if (e.isSecondaryButtonDown()) {
                 currentTool = new EraserTool();
                 applyTool(e.getX(), e.getY());
                 currentTool = previousTool;
@@ -464,7 +410,7 @@ public class PixelArtEditor extends Application {
             );
             File selectedFile = fileChooser.showOpenDialog(primaryStage);
             if (selectedFile != null) {
-                clearCanvas();
+
                 loadAndDisplaySpriteSheet(selectedFile);
             }
         });
@@ -508,16 +454,8 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
-        //clear canvas button
-        Button clearButton = new Button("Clear Canvas");
-        clearButton.setOnAction(e -> clearCanvas());
-
-        ToggleButton lineToolButton = new ToggleButton("Line");
-        lineToolButton.setToggleGroup(toolsGroup);
-        lineToolButton.setOnAction(e -> currentTool = new LineTool());
-
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton,eyeDropperToolButton, squareToolButton,lineToolButton, createSpriteButton,
-                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton, clearButton);
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton, createSpriteButton,
+                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
@@ -557,8 +495,15 @@ public class PixelArtEditor extends Application {
         scene.getStylesheets().add("dark-theme.css");
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
-        primaryStage.setWidth(1366);
-        primaryStage.setHeight(768);
+        primaryStage.show();
+        primaryStage.setFullScreen(true);
+        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
+            if (wasFullScreen) {
+                primaryStage.setWidth(800); // Set the width to 800 pixels
+                primaryStage.setHeight(600); // Set the height to 600 pixels
+                primaryStage.centerOnScreen(); // Center the stage on the screen
+            }
+        });
         primaryStage.show();
     }
 
