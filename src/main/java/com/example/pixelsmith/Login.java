@@ -28,9 +28,14 @@ public class Login extends Application {
             String enteredPassword = passwordField.getText();
             try {
                 if (authenticate(email, enteredPassword)) {
-                    // If authentication is successful, open the PixelArtEditor
-                    new PixelArtEditor().start(new Stage());
-                    primaryStage.close();
+                    Integer userId = retrieveUserId(email);
+                    if (userId != null) {
+                        UserSession.setCurrentUserId(userId); // Set the user ID
+                        new PixelArtEditor().start(new Stage());
+                        primaryStage.close();
+                    } else {
+                        showAlert("Login Failed", "User ID not found.");
+                    }
                 } else {
                     showAlert("Login Failed", "Invalid email or password.");
                 }
@@ -80,6 +85,23 @@ public class Login extends Application {
             }
         }
         return false;
+    }
+
+    private Integer retrieveUserId(String email) {
+        String query = "SELECT UserId FROM users WHERE Email = ?";
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setString(1, email);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("UserId");
+                }
+            }
+        } catch (SQLException ex) {
+            showAlert("Database Error", ex.getMessage());
+        }
+        return null; // Return null if user ID not found or in case of an exception
     }
 
     private void showAlert(String title, String content) {

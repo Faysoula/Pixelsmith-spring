@@ -6,11 +6,10 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
-import javafx.scene.image.PixelReader;
-import javafx.scene.image.PixelWriter;
-import javafx.scene.image.WritableImage;
+import javafx.scene.image.*;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -20,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.sql.*;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
@@ -38,6 +38,78 @@ public class PixelArtEditor extends Application {
     //private double scale = 1.0;
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
+
+    /* sql stuff */
+    private Connection getDBConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
+    }
+
+    private void saveSpriteToDB(String spriteName, int userId, String pathToSprite) {
+        String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
+        String insertSpriteDataQuery = "INSERT INTO spritedata (SpriteID, PathDirect) VALUES (?, ?)";
+
+        try (Connection conn = getDBConnection();
+             PreparedStatement pstmt = conn.prepareStatement(insertSpriteQuery, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setInt(1, userId);
+            pstmt.setString(2, spriteName);
+            pstmt.executeUpdate();
+
+            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    int spriteId = generatedKeys.getInt(1);
+                    try (PreparedStatement pstmtData = conn.prepareStatement(insertSpriteDataQuery)) {
+                        pstmtData.setInt(1, spriteId);
+                        pstmtData.setString(2, pathToSprite);
+                        pstmtData.executeUpdate();
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(); // Handle exception properly in production code
+        }
+    }
+
+
+
+    private void openSpriteForEditing(int spriteId, String pathToSprite) {
+        try {
+            File spriteFile = new File(pathToSprite);
+            if (!spriteFile.exists()) {
+                // Handle the case where the file does not exist
+                System.out.println("Sprite file not found: " + pathToSprite);
+                return;
+            }
+
+            // Load the sprite image
+            Image spriteImage = new Image(new FileInputStream(spriteFile));
+            PixelReader pixelReader = spriteImage.getPixelReader();
+
+            // Determine the size of the sprite image
+            int spriteSheetRows = (int) spriteImage.getHeight();
+            int spriteSheetCols = (int) spriteImage.getWidth();
+
+            // Resize the canvas and pixel array to match the sprite image size
+            CANVAS_WIDTH = spriteSheetCols * GRID_SIZE;
+            CANVAS_HEIGHT = spriteSheetRows * GRID_SIZE;
+            ROWS = spriteSheetRows;
+            COLS = spriteSheetCols;
+            pixels = new Color[ROWS][COLS];
+
+            // Update the pixel array based on the loaded image
+            for (int row = 0; row < ROWS; row++) {
+                for (int col = 0; col < COLS; col++) {
+                    Color color = pixelReader.getColor(col, row);
+                    pixels[row][col] = color;
+                    renderPixel(row, col);
+                }
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("Error loading the sprite file: " + e.getMessage());
+        }
+    }
+
+
 
     // Tool interface
     interface Tool {
@@ -297,6 +369,7 @@ public class PixelArtEditor extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+
         initializeGrid();
         BorderPane root = new BorderPane();
         Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -334,25 +407,17 @@ public class PixelArtEditor extends Application {
         // Add the toolbar on the left and canvas in the center
         root.setCenter(canvas);
 
-        Tool previousTool = currentTool; // Keep track of the previous tool
+        // Keep track of the previous tool
 
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isSecondaryButtonDown()) {
-                currentTool = new EraserTool();
-                applyTool(e.getX(), e.getY());
-                currentTool = previousTool;
             }
         });
 
         canvas.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown()) {
                 applyTool(e.getX(), e.getY());
-            } else if (e.isSecondaryButtonDown()) {
-                currentTool = new EraserTool();
-                applyTool(e.getX(), e.getY());
-                currentTool = previousTool;
             }
         });
 
@@ -378,8 +443,17 @@ public class PixelArtEditor extends Application {
             dialog.setContentText("Name:");
 
             Optional<String> result = dialog.showAndWait();
-            result.ifPresent(this::createNewSpriteEditor);
+            result.ifPresent(spriteName -> {
+                String savedPath = saveSpriteSheet(renderSpriteSheet(), primaryStage);
+                if (savedPath != null) {
+                    // Assuming you have a way to get the userId of the logged-in user
+                    int userId = UserSession.getCurrentUserId();
+                    saveSpriteToDB(spriteName, userId, savedPath);
+                }
+                createNewSpriteEditor(spriteName);
+            });
         });
+
 
         Slider sizeSlider = new Slider(0, toolSizes.length - 1, 0);
         sizeSlider.setMajorTickUnit(1);
@@ -396,7 +470,6 @@ public class PixelArtEditor extends Application {
                 currentTool.setToolSize(selectedSize);
             }
         });
-
         // Add size controls to the toolbar
         Label sizeLabel = new Label("Tool Size:");
 
