@@ -35,6 +35,9 @@ public class PixelArtEditor extends Application {
     private GraphicsContext gc;
     private ColorPicker colorPicker;
     private Tool currentTool;
+
+    private Integer currentSpriteId = null; // Null indicates a new sprite
+    private String currentSpritePath = null; // Path to the saved sprite image
     //private double scale = 1.0;
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
@@ -67,6 +70,87 @@ public class PixelArtEditor extends Application {
             }
         } catch (SQLException ex) {
             ex.printStackTrace(); // Handle exception properly in production code
+        }
+    }
+
+    //sprite save things
+    private void saveCurrentSprite(Stage primaryStage) {
+        if (currentSpriteId == null) {
+            // First-time save (export)
+            TextInputDialog dialog = new TextInputDialog("New Sprite");
+            dialog.setTitle("Save Sprite");
+            dialog.setHeaderText("Enter a name for your sprite:");
+            dialog.setContentText("Name:");
+
+            Optional<String> result = dialog.showAndWait();
+            result.ifPresent(spriteName -> {
+                Image spriteSheet = renderSpriteSheet();
+                currentSpritePath = saveSpriteSheet(spriteSheet, primaryStage);
+                if (currentSpritePath != null) {
+                    int userId = UserSession.getCurrentUserId(); // Get the current user ID
+                    createNewSprite(spriteName, userId, currentSpritePath);
+                }
+            });
+        } else {
+            // Update existing sprite
+            updateExistingSprite(currentSpriteId, currentSpritePath);
+        }
+    }
+    private void createNewSprite(String spriteName, int userId, String pathToSprite) {
+        String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
+        String insertSpriteDataQuery = "INSERT INTO spritedata (SpriteID, PathDirect) VALUES (?, ?)";
+
+        try (Connection conn = getDBConnection();
+             PreparedStatement pstmt = conn.prepareStatement(insertSpriteQuery, Statement.RETURN_GENERATED_KEYS)) {
+
+
+            pstmt.setInt(1, userId);
+            pstmt.setString(2, spriteName);
+            pstmt.executeUpdate();
+
+            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    currentSpriteId = generatedKeys.getInt(1); // Save the generated sprite ID
+                    try (PreparedStatement pstmtData = conn.prepareStatement(insertSpriteDataQuery)) {
+                        pstmtData.setInt(1, currentSpriteId);
+                        pstmtData.setString(2, pathToSprite);
+                        pstmtData.executeUpdate();
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(); // Proper error handling should be implemented
+        }
+    }
+
+    private void updateExistingSprite(int spriteId, String pathToSprite) {
+        // Render the updated sprite sheet
+        Image updatedSpriteSheet = renderSpriteSheet();
+        // Save the updated sprite sheet to the existing file path
+        saveUpdatedSpriteSheet(updatedSpriteSheet, pathToSprite);
+
+        String updateSpriteQuery = "UPDATE Sprites SET LastModifiedDate = NOW() WHERE SpriteID = ?";
+        // You might also need to update other sprite information depending on your requirements
+
+        try (Connection conn = getDBConnection();
+             PreparedStatement pstmt = conn.prepareStatement(updateSpriteQuery)) {
+
+            pstmt.setInt(1, spriteId);
+            pstmt.executeUpdate();
+
+            // If you have additional sprite data to update, add the logic here
+        } catch (SQLException ex) {
+            ex.printStackTrace(); // Proper error handling should be implemented
+        }
+    }
+
+    private void saveUpdatedSpriteSheet(Image spriteSheet, String filePath) {
+        try {
+            // Save the updated image back to the original file
+            ImageIO.write(SwingFXUtils.fromFXImage(spriteSheet, null), "png", new File(filePath));
+        } catch (IOException e) {
+            System.out.println("Error saving the updated sprite sheet: " + e.getMessage());
+            // Proper error handling should be implemented
         }
     }
 
@@ -388,6 +472,7 @@ public class PixelArtEditor extends Application {
         ToggleButton eraserToolButton = new ToggleButton("Eraser");
         ToggleButton fillToolButton = new ToggleButton("Fill");
         ToggleButton squareToolButton = new ToggleButton("Square");
+        Button saveProgressButton = new Button("Save Progress");
 
         SquareTool squareTool = new SquareTool();
 
@@ -395,6 +480,7 @@ public class PixelArtEditor extends Application {
         eraserToolButton.setToggleGroup(toolsGroup);
         fillToolButton.setToggleGroup(toolsGroup);
         squareToolButton.setToggleGroup(toolsGroup);
+        saveProgressButton.setOnAction(e -> saveCurrentSprite(primaryStage));
 
         penToolButton.setSelected(true); // Pen tool is selected by default
         currentTool = new PenTool(); // Default tool
@@ -404,10 +490,10 @@ public class PixelArtEditor extends Application {
         fillToolButton.setOnAction(e -> currentTool = new FillTool());
         squareToolButton.setOnAction(e -> currentTool = squareTool);
 
-        // Add the toolbar on the left and canvas in the center
+
         root.setCenter(canvas);
 
-        // Keep track of the previous tool
+
 
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
@@ -528,7 +614,7 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton, createSpriteButton,
-                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton);
+                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton,saveProgressButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
@@ -569,14 +655,17 @@ public class PixelArtEditor extends Application {
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
         primaryStage.show();
-        primaryStage.setFullScreen(true);
-        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
-            if (wasFullScreen) {
-                primaryStage.setWidth(800); // Set the width to 800 pixels
-                primaryStage.setHeight(600); // Set the height to 600 pixels
-                primaryStage.centerOnScreen(); // Center the stage on the screen
-            }
-        });
+        primaryStage.setWidth(1000); // Set the width to 800 pixels
+        primaryStage.setHeight(1000);
+        primaryStage.centerOnScreen(); // Center the stage on the screen
+//        primaryStage.setFullScreen(true);
+//        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
+//            if (wasFullScreen) {
+//                primaryStage.setWidth(800); // Set the width to 800 pixels
+//                primaryStage.setHeight(600); // Set the height to 600 pixels
+//                primaryStage.centerOnScreen(); // Center the stage on the screen
+//            }
+//        });
         primaryStage.show();
     }
 
