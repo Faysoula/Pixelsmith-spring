@@ -8,12 +8,9 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.*;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,8 +39,27 @@ public class PixelArtEditor extends Application {
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
+    //external methods
+    public void openSprite(int spriteId, String pathToSprite,Stage primaryStage) {
+        this.currentSpriteId = spriteId;
+        this.currentSpritePath = pathToSprite;
+        start(primaryStage);
+        openSpriteForEditing(spriteId, pathToSprite);
+    }
+    // singleton
+    private static PixelArtEditor instance;
+    // Private constructor for singleton
+    private PixelArtEditor() {}
+    // Public method to get the instance
+    public static PixelArtEditor getInstance() {
+        if (instance == null) {
+            instance = new PixelArtEditor();
+        }
+        return instance;
+    }
+
     /* sql stuff */
-    private Connection getDBConnection() throws SQLException {
+    static Connection getDBConnection() throws SQLException {
         return DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
     }
 
@@ -69,13 +85,13 @@ public class PixelArtEditor extends Application {
                 }
             }
         } catch (SQLException ex) {
-            ex.printStackTrace(); // Handle exception properly in production code
+            System.out.println("error saving your sprite" + ex.getMessage());
         }
     }
 
     //sprite save things
     private void saveCurrentSprite(Stage primaryStage) {
-        if (currentSpriteId == null) {
+        if (currentSpritePath == null) {
             // First-time save (export)
             TextInputDialog dialog = new TextInputDialog("New Sprite");
             dialog.setTitle("Save Sprite");
@@ -93,10 +109,14 @@ public class PixelArtEditor extends Application {
             });
         } else {
             // Update existing sprite
+            Image spriteSheet = renderSpriteSheet();
+            saveUpdatedSpriteSheet(spriteSheet, currentSpritePath);
             updateExistingSprite(currentSpriteId, currentSpritePath);
         }
     }
-    private void createNewSprite(String spriteName, int userId, String pathToSprite) {
+
+    void createNewSprite(String spriteName, int userId, String pathToSprite) {
+
         String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
         String insertSpriteDataQuery = "INSERT INTO spritedata (SpriteID, PathDirect) VALUES (?, ?)";
 
@@ -119,7 +139,7 @@ public class PixelArtEditor extends Application {
                 }
             }
         } catch (SQLException ex) {
-            ex.printStackTrace(); // Proper error handling should be implemented
+            System.out.println("error creating your sprite"); // Proper error handling should be implemented
         }
     }
 
@@ -140,7 +160,7 @@ public class PixelArtEditor extends Application {
 
             // If you have additional sprite data to update, add the logic here
         } catch (SQLException ex) {
-            ex.printStackTrace(); // Proper error handling should be implemented
+            System.out.println("error updating your sprite");
         }
     }
 
@@ -150,7 +170,6 @@ public class PixelArtEditor extends Application {
             ImageIO.write(SwingFXUtils.fromFXImage(spriteSheet, null), "png", new File(filePath));
         } catch (IOException e) {
             System.out.println("Error saving the updated sprite sheet: " + e.getMessage());
-            // Proper error handling should be implemented
         }
     }
 
@@ -192,8 +211,6 @@ public class PixelArtEditor extends Application {
             System.out.println("Error loading the sprite file: " + e.getMessage());
         }
     }
-
-
 
     // Tool interface
     interface Tool {
@@ -368,7 +385,7 @@ public class PixelArtEditor extends Application {
         }
     }
 
-    private void createNewSpriteEditor(String spriteName) {
+    void createNewSpriteEditor(String spriteName) {
         Stage newSpriteStage = new Stage();
         newSpriteStage.setTitle(spriteName);
 
@@ -380,7 +397,8 @@ public class PixelArtEditor extends Application {
 
     private void loadAndDisplaySpriteSheet(File file) {
         try {
-            // Load the sprite sheet with no scaling or smoothing
+            clearCanvas();
+            // Load the sprite sheet with no scaling or smoothing so the sprite aesthetic doesnt get ruined
             Image spriteSheet = new Image(new FileInputStream(file));
             PixelReader pixelReader = spriteSheet.getPixelReader();
 
@@ -450,6 +468,10 @@ public class PixelArtEditor extends Application {
 
         return null;
     }
+    private void clearCanvas(){
+        initializeGrid();
+        renderGrid();
+    }
 
     @Override
     public void start(Stage primaryStage) {
@@ -480,7 +502,7 @@ public class PixelArtEditor extends Application {
         eraserToolButton.setToggleGroup(toolsGroup);
         fillToolButton.setToggleGroup(toolsGroup);
         squareToolButton.setToggleGroup(toolsGroup);
-        saveProgressButton.setOnAction(e -> saveCurrentSprite(primaryStage));
+        saveProgressButton.setOnAction(_ -> saveCurrentSprite(primaryStage));
 
         penToolButton.setSelected(true); // Pen tool is selected by default
         currentTool = new PenTool(); // Default tool
@@ -493,7 +515,9 @@ public class PixelArtEditor extends Application {
 
         root.setCenter(canvas);
 
-
+        //clear buttton
+        Button clearCanvasButton = new Button("Clear Canvas");
+        clearCanvasButton.setOnAction(e -> clearCanvas());
 
         canvas.setOnMouseClicked(e -> {
             if (e.isPrimaryButtonDown()) {
@@ -523,22 +547,9 @@ public class PixelArtEditor extends Application {
 
         Button createSpriteButton = new Button("Create Sprite");
         createSpriteButton.setOnAction(e -> {
-            TextInputDialog dialog = new TextInputDialog("New Sprite");
-            dialog.setTitle("Create New Sprite");
-            dialog.setHeaderText("Enter the name for the new sprite:");
-            dialog.setContentText("Name:");
-
-            Optional<String> result = dialog.showAndWait();
-            result.ifPresent(spriteName -> {
-                String savedPath = saveSpriteSheet(renderSpriteSheet(), primaryStage);
-                if (savedPath != null) {
-                    // Assuming you have a way to get the userId of the logged-in user
-                    int userId = UserSession.getCurrentUserId();
-                    saveSpriteToDB(spriteName, userId, savedPath);
-                }
-                createNewSpriteEditor(spriteName);
+                createNewSpriteEditor("new sprite");
             });
-        });
+
 
 
         Slider sizeSlider = new Slider(0, toolSizes.length - 1, 0);
@@ -558,7 +569,6 @@ public class PixelArtEditor extends Application {
         });
         // Add size controls to the toolbar
         Label sizeLabel = new Label("Tool Size:");
-
 
         Button importSpriteButton = new Button("Import Sprite Sheet");
         importSpriteButton.setOnAction(e -> {
@@ -604,7 +614,6 @@ public class PixelArtEditor extends Application {
             String savedPath = saveSpriteSheet(spriteSheet, primaryStage);
             if (savedPath != null) {
                 System.out.println("Saved Sprite Sheet at: " + savedPath);
-                // 'savedPath' in a variable for further use
             }
         });
 
@@ -614,7 +623,7 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton, createSpriteButton,
-                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton,saveProgressButton);
+                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton,saveProgressButton,clearCanvasButton);
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
@@ -655,8 +664,8 @@ public class PixelArtEditor extends Application {
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
         primaryStage.show();
-        primaryStage.setWidth(1000); // Set the width to 800 pixels
-        primaryStage.setHeight(1000);
+        primaryStage.setWidth(800); // Set the width to 800 pixels
+        primaryStage.setHeight(600);
         primaryStage.centerOnScreen(); // Center the stage on the screen
 //        primaryStage.setFullScreen(true);
 //        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
@@ -679,6 +688,7 @@ public class PixelArtEditor extends Application {
     }
 
     public static void main(String[] args) {
+        instance = new PixelArtEditor();
         launch(args);
     }
 }

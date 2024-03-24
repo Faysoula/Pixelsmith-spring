@@ -30,8 +30,9 @@ public class Login extends Application {
                 if (authenticate(email, enteredPassword)) {
                     Integer userId = retrieveUserId(email);
                     if (userId != null) {
-                        UserSession.setCurrentUserId(userId); // Set the user ID
-                        new PixelArtEditor().start(new Stage());
+                        UserSession.setCurrentUserId(userId);
+                        int cuser = UserSession.getCurrentUserId();
+                        new SpriteSelector(cuser).start(new Stage());
                         primaryStage.close();
                     } else {
                         showAlert("Login Failed", "User ID not found.");
