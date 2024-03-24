@@ -350,7 +350,7 @@ public class PixelArtEditor extends Application {
             return currentColor.equals(targetColor) || currentColor.equals(getCheckerboardColor(0, 0)) || currentColor.equals(getCheckerboardColor(0, 1));
         }
     }
-
+    //line tool
     class LineTool implements Tool {
         private int startX, startY; // Starting coordinates
         private boolean drawing = false;
