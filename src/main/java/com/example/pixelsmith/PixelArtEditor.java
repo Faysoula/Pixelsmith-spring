@@ -174,7 +174,6 @@ public class PixelArtEditor extends Application {
     }
 
 
-
     private void openSpriteForEditing(int spriteId, String pathToSprite) {
         try {
             File spriteFile = new File(pathToSprite);
@@ -352,6 +351,57 @@ public class PixelArtEditor extends Application {
         }
     }
 
+    class LineTool implements Tool {
+        private int startX, startY; // Starting coordinates
+        private boolean drawing = false;
+
+        @Override
+        public void apply(int row, int col) {
+            if (!drawing) {
+                startX = col;
+                startY = row;
+                drawing = true;
+            } else {
+                drawBresenhamLine(startX, startY, col, row);
+                drawing = false;
+            }
+        }
+    }
+    private void drawBresenhamLine(int x1, int y1, int x2, int y2) {
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
+
+        int err = dx - dy;
+        int e2;
+
+        while (true) {
+            if (x1 >= 0 && x1 < COLS && y1 >= 0 && y1 < ROWS) {
+                pixels[y1][x1] = colorPicker.getValue();
+                renderPixel(y1, x1);
+            }
+
+            if (x1 == x2 && y1 == y2) {
+                break;
+            }
+
+            e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x1 += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y1 += sy;
+            }
+        }
+    }
+
+
+
+
     // Initialize the grid with a checkerboard pattern
     private void initializeGrid() {
         for (int row = 0; row < ROWS; row++) {
@@ -512,6 +562,10 @@ public class PixelArtEditor extends Application {
         fillToolButton.setOnAction(e -> currentTool = new FillTool());
         squareToolButton.setOnAction(e -> currentTool = squareTool);
 
+        ToggleButton lineToolButton = new ToggleButton("Line");
+        lineToolButton.setToggleGroup(toolsGroup);
+        lineToolButton.setOnAction(e -> currentTool = new LineTool());
+
 
         root.setCenter(canvas);
 
@@ -622,7 +676,7 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton, createSpriteButton,
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton,lineToolButton, createSpriteButton,
                 importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton,saveProgressButton,clearCanvasButton);
         root.setTop(toolBar);
 
