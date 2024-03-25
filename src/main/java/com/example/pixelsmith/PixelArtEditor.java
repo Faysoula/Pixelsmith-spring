@@ -35,7 +35,7 @@ public class PixelArtEditor extends Application {
 
     private Integer currentSpriteId = null; // Null indicates a new sprite
     private String currentSpritePath = null; // Path to the saved sprite image
-    //private double scale = 1.0;
+
 
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
@@ -62,33 +62,6 @@ public class PixelArtEditor extends Application {
     static Connection getDBConnection() throws SQLException {
         return DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
     }
-
-    private void saveSpriteToDB(String spriteName, int userId, String pathToSprite) {
-        String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
-        String insertSpriteDataQuery = "INSERT INTO spritedata (SpriteID, PathDirect) VALUES (?, ?)";
-
-        try (Connection conn = getDBConnection();
-             PreparedStatement pstmt = conn.prepareStatement(insertSpriteQuery, Statement.RETURN_GENERATED_KEYS)) {
-
-            pstmt.setInt(1, userId);
-            pstmt.setString(2, spriteName);
-            pstmt.executeUpdate();
-
-            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    int spriteId = generatedKeys.getInt(1);
-                    try (PreparedStatement pstmtData = conn.prepareStatement(insertSpriteDataQuery)) {
-                        pstmtData.setInt(1, spriteId);
-                        pstmtData.setString(2, pathToSprite);
-                        pstmtData.executeUpdate();
-                    }
-                }
-            }
-        } catch (SQLException ex) {
-            System.out.println("error saving your sprite" + ex.getMessage());
-        }
-    }
-
     //sprite save things
     private void saveCurrentSprite(Stage primaryStage) {
         if (currentSpritePath == null) {
@@ -426,6 +399,25 @@ public class PixelArtEditor extends Application {
         gc.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
     }
 
+    private Image renderSpriteSheet() {
+        WritableImage spriteSheet = new WritableImage(COLS, ROWS);
+        PixelWriter pixelWriter = spriteSheet.getPixelWriter();
+
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
+                Color pixelColor = pixels[row][col];
+                // If the pixel color matches the checkerboard color, write black color
+                if (pixelColor.equals(getCheckerboardColor(row, col))) {
+                    pixelWriter.setColor(col, row, Color.TRANSPARENT);
+                } else {
+                    pixelWriter.setColor(col, row, pixelColor);
+                }
+            }
+        }
+
+        return spriteSheet;
+    }
+
     // Determine the checkerboard pattern color based on the position
     private Color getCheckerboardColor(int row, int col) {
         if ((row + col) % 2 == 0) {
@@ -435,6 +427,7 @@ public class PixelArtEditor extends Application {
         }
     }
 
+    // Create a new sprite editor
     void createNewSpriteEditor(String spriteName) {
         Stage newSpriteStage = new Stage();
         newSpriteStage.setTitle(spriteName);
@@ -445,6 +438,7 @@ public class PixelArtEditor extends Application {
         editor.start(newSpriteStage); // Start the new editor on a new stage
     }
 
+    // Load and display a sprite sheet from a file
     private void loadAndDisplaySpriteSheet(File file) {
         try {
             clearCanvas();
@@ -480,24 +474,7 @@ public class PixelArtEditor extends Application {
         }
     }
 
-    private Image renderSpriteSheet() {
-        WritableImage spriteSheet = new WritableImage(COLS, ROWS);
-        PixelWriter pixelWriter = spriteSheet.getPixelWriter();
-
-        for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLS; col++) {
-                Color pixelColor = pixels[row][col];
-                // If the pixel color matches the checkerboard color, write black color
-                if (pixelColor.equals(getCheckerboardColor(row, col))) {
-                    pixelWriter.setColor(col, row, Color.TRANSPARENT);
-                } else {
-                    pixelWriter.setColor(col, row, pixelColor);
-                }
-            }
-        }
-
-        return spriteSheet;
-    }
+    // Render the sprite sheet based on the pixel data structure
 
     private String saveSpriteSheet(Image spriteSheet, Stage primaryStage) {
         FileChooser fileChooser = new FileChooser();
@@ -535,16 +512,16 @@ public class PixelArtEditor extends Application {
         // Initialize color picker
         colorPicker = new ColorPicker(Color.BLACK);
 
-
         // Initialize toolbar and tools
         ToolBar toolBar = new ToolBar();
         ToggleGroup toolsGroup = new ToggleGroup();
 
-        ToggleButton penToolButton = new ToggleButton("Pen");
-        ToggleButton eraserToolButton = new ToggleButton("Eraser");
-        ToggleButton fillToolButton = new ToggleButton("Fill");
-        ToggleButton squareToolButton = new ToggleButton("Square");
-        Button saveProgressButton = new Button("Save Progress");
+        ToggleButton penToolButton = new ToggleButton();
+        ToggleButton eraserToolButton = new ToggleButton();
+        ToggleButton fillToolButton = new ToggleButton();
+        ToggleButton squareToolButton = new ToggleButton();
+        ToggleButton lineToolButton = new ToggleButton();
+        Button saveProgressButton = new Button();
 
         SquareTool squareTool = new SquareTool();
 
@@ -562,15 +539,13 @@ public class PixelArtEditor extends Application {
         fillToolButton.setOnAction(e -> currentTool = new FillTool());
         squareToolButton.setOnAction(e -> currentTool = squareTool);
 
-        ToggleButton lineToolButton = new ToggleButton("Line");
         lineToolButton.setToggleGroup(toolsGroup);
         lineToolButton.setOnAction(e -> currentTool = new LineTool());
-
 
         root.setCenter(canvas);
 
         //clear buttton
-        Button clearCanvasButton = new Button("Clear Canvas");
+        Button clearCanvasButton = new Button();
         clearCanvasButton.setOnAction(e -> clearCanvas());
 
         canvas.setOnMouseClicked(e -> {
@@ -599,11 +574,10 @@ public class PixelArtEditor extends Application {
             }
         });
 
-        Button createSpriteButton = new Button("Create Sprite");
+        Button createSpriteButton = new Button();
         createSpriteButton.setOnAction(e -> {
                 createNewSpriteEditor("new sprite");
             });
-
 
 
         Slider sizeSlider = new Slider(0, toolSizes.length - 1, 0);
@@ -662,7 +636,7 @@ public class PixelArtEditor extends Application {
             event.consume();
         });
 
-        Button exportButton = new Button("Export Sprite Sheet");
+        Button exportButton = new Button();
         exportButton.setOnAction(e -> {
             Image spriteSheet = renderSpriteSheet();
             String savedPath = saveSpriteSheet(spriteSheet, primaryStage);
@@ -672,12 +646,13 @@ public class PixelArtEditor extends Application {
         });
 
         //eyedropper tool
-        ToggleButton eyeDropperToolButton = new ToggleButton("Eye Dropper");
+        ToggleButton eyeDropperToolButton = new ToggleButton();
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton,colorPicker,sizeLabel, sizeSlider, squareToolButton,lineToolButton, createSpriteButton,
+                importSpriteButton, exportButton ,saveProgressButton,clearCanvasButton);
 
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, squareToolButton,lineToolButton, createSpriteButton,
-                importSpriteButton, colorPicker, sizeLabel, sizeSlider, exportButton,saveProgressButton,clearCanvasButton);
+
         root.setTop(toolBar);
 
         Scene scene = new Scene(root, CANVAS_WIDTH + 100, CANVAS_HEIGHT);
@@ -714,14 +689,27 @@ public class PixelArtEditor extends Application {
             }
         });
 
+        //styling for all buttons
         scene.getStylesheets().add("dark-theme.css");
+        penToolButton.getStyleClass().add("pen-tool-button");
+        eraserToolButton.getStyleClass().add("ear-tool-button");
+        fillToolButton.getStyleClass().add("fill-tool-button");
+        eyeDropperToolButton.getStyleClass().add("eye");
+        squareToolButton.getStyleClass().add("square");
+        lineToolButton.getStyleClass().add("line");
+        createSpriteButton.getStyleClass().add("createnew");
+        importSpriteButton.getStyleClass().add("importimage");
+        exportButton.getStyleClass().add("exportimage");
+        saveProgressButton.getStyleClass().add("save");
+        clearCanvasButton.getStyleClass().add("clear");
+
         primaryStage.setTitle("Pixel Art Editor");
         primaryStage.setScene(scene);
         primaryStage.show();
         primaryStage.setWidth(800); // Set the width to 800 pixels
         primaryStage.setHeight(600);
         primaryStage.centerOnScreen(); // Center the stage on the screen
-//        primaryStage.setFullScreen(true);
+//      primaryStage.setFullScreen(true);
 //        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
 //            if (wasFullScreen) {
 //                primaryStage.setWidth(800); // Set the width to 800 pixels

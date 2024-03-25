@@ -49,9 +49,6 @@ public class SpriteSelector extends Application {
         }
     }
 
-
-
-
     private void populateSpriteList() {
         String query = "SELECT Name, PathDirect FROM spritedata JOIN Sprites ON spritedata.SpriteID = Sprites.SpriteID WHERE UserId = ?";
 

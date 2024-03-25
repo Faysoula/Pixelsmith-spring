@@ -32,3 +32,70 @@
 .slider .track {
     -fx-background-color: #444;
 }
+.pen-tool-button, .ear-tool-button, .fill-tool-button, .square, .eye, .line,
+    .clear, .createnew, .save, .importimage, .exportimage{
+    -fx-background-position: center;
+    -fx-background-repeat: no-repeat;
+    -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;
+    -fx-alignment: center;
+    -fx-padding: 10 10 10 10; /* Padding inside the button */ /* Margin for even spacing */
+    -fx-border: none; /* No border by default */
+    -fx-min-width: 50px;
+    -fx-min-height: 50px;
+    -fx-max-width: 50px;
+    -fx-max-height: 50px;
+    -fx-margin: 25px 5px;
+}
+
+/* Selected state */
+.pen-tool-button:selected, .ear-tool-button:selected, .fill-tool-button:selected, .square:selected, .eye:selected,
+.line:selected, .clear:selected, .createnew:selected, .save:selected, .importimage:selected, .exportimage:selected{
+    -fx-background-color: #FFC107; /* Background color change for visual effect */
+    -fx-border: 2px solid orange; /* Orange border to highlight the selected tool */
+}
+
+/* Specific background images */
+.pen-tool-button {
+    -fx-background-image: url('pen_tool_icon.png');
+}
+
+.ear-tool-button {
+    -fx-background-image: url('ear-tool-icon.png');
+}
+
+.fill-tool-button {
+    -fx-background-image: url('fill.png');
+}
+
+.square {
+    -fx-background-image: url('squareT.png');
+}
+
+.eye {
+    -fx-background-image: url('eye.png');
+}
+
+.line {
+    -fx-background-image: url('linet.png');
+}
+
+.clear {
+    -fx-background-image: url('clear.png');
+}
+
+.createnew {
+    -fx-background-image: url('createnew.png');
+}
+
+.save {
+    -fx-background-image: url('save.png');
+}
+
+.importimage {
+    -fx-background-image: url('import.png');
+}
+
+.exportimage {
+    -fx-background-image: url('export.png');
+}
