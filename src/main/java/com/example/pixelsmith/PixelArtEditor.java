@@ -48,9 +48,9 @@ public class PixelArtEditor extends Application {
     }
     // singleton
     private static PixelArtEditor instance;
-    // Private constructor for singleton
+
     private PixelArtEditor() {}
-    // Public method to get the instance
+
     public static PixelArtEditor getInstance() {
         if (instance == null) {
             instance = new PixelArtEditor();
@@ -88,6 +88,7 @@ public class PixelArtEditor extends Application {
         }
     }
 
+    // Create a new sprite in the database
     void createNewSprite(String spriteName, int userId, String pathToSprite) {
 
         String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
@@ -123,7 +124,7 @@ public class PixelArtEditor extends Application {
         saveUpdatedSpriteSheet(updatedSpriteSheet, pathToSprite);
 
         String updateSpriteQuery = "UPDATE Sprites SET LastModifiedDate = NOW() WHERE SpriteID = ?";
-        // You might also need to update other sprite information depending on your requirements
+
 
         try (Connection conn = getDBConnection();
              PreparedStatement pstmt = conn.prepareStatement(updateSpriteQuery)) {
@@ -131,7 +132,6 @@ public class PixelArtEditor extends Application {
             pstmt.setInt(1, spriteId);
             pstmt.executeUpdate();
 
-            // If you have additional sprite data to update, add the logic here
         } catch (SQLException ex) {
             System.out.println("error updating your sprite");
         }
@@ -151,7 +151,6 @@ public class PixelArtEditor extends Application {
         try {
             File spriteFile = new File(pathToSprite);
             if (!spriteFile.exists()) {
-                // Handle the case where the file does not exist
                 System.out.println("Sprite file not found: " + pathToSprite);
                 return;
             }
@@ -224,7 +223,6 @@ public class PixelArtEditor extends Application {
 
         @Override
         public void apply(int row, int col) {
-            // For the square tool, apply doesn't do anything on a single click
         }
 
         // Start drawing the square
@@ -372,9 +370,6 @@ public class PixelArtEditor extends Application {
         }
     }
 
-
-
-
     // Initialize the grid with a checkerboard pattern
     private void initializeGrid() {
         for (int row = 0; row < ROWS; row++) {
@@ -474,8 +469,6 @@ public class PixelArtEditor extends Application {
         }
     }
 
-    // Render the sprite sheet based on the pixel data structure
-
     private String saveSpriteSheet(Image spriteSheet, Stage primaryStage) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Save Sprite Sheet");
@@ -529,7 +522,7 @@ public class PixelArtEditor extends Application {
         eraserToolButton.setToggleGroup(toolsGroup);
         fillToolButton.setToggleGroup(toolsGroup);
         squareToolButton.setToggleGroup(toolsGroup);
-        saveProgressButton.setOnAction(_ -> saveCurrentSprite(primaryStage));
+        saveProgressButton.setOnAction(e -> saveCurrentSprite(primaryStage));
 
         penToolButton.setSelected(true); // Pen tool is selected by default
         currentTool = new PenTool(); // Default tool
@@ -544,7 +537,7 @@ public class PixelArtEditor extends Application {
 
         root.setCenter(canvas);
 
-        //clear buttton
+        //clear button
         Button clearCanvasButton = new Button();
         clearCanvasButton.setOnAction(e -> clearCanvas());
 
@@ -598,7 +591,7 @@ public class PixelArtEditor extends Application {
         // Add size controls to the toolbar
         Label sizeLabel = new Label("Tool Size:");
 
-        Button importSpriteButton = new Button("Import Sprite Sheet");
+        Button importSpriteButton = new Button("");
         importSpriteButton.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
             fileChooser.setTitle("Open Sprite Sheet");
@@ -649,6 +642,8 @@ public class PixelArtEditor extends Application {
         ToggleButton eyeDropperToolButton = new ToggleButton();
         eyeDropperToolButton.setToggleGroup(toolsGroup);
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
+
+        // Add the tools to the toolbar
         toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton,colorPicker,sizeLabel, sizeSlider, squareToolButton,lineToolButton, createSpriteButton,
                 importSpriteButton, exportButton ,saveProgressButton,clearCanvasButton);
 
@@ -664,7 +659,6 @@ public class PixelArtEditor extends Application {
                 lastKnownPosition[0] = e.getSceneX();
                 lastKnownPosition[1] = e.getSceneY();
             } else if (currentTool instanceof SquareTool) {
-                // Your existing tool logic
                 squareTool.onMousePressed((int) e.getY() / GRID_SIZE, (int) e.getX() / GRID_SIZE);
             } else {
                 applyTool(e.getX(), e.getY());
@@ -709,6 +703,8 @@ public class PixelArtEditor extends Application {
         primaryStage.setWidth(800); // Set the width to 800 pixels
         primaryStage.setHeight(600);
         primaryStage.centerOnScreen(); // Center the stage on the screen
+        Image applicationIcon = new Image("icon.png");
+        primaryStage.getIcons().add(applicationIcon);
 //      primaryStage.setFullScreen(true);
 //        primaryStage.fullScreenProperty().addListener((observable, wasFullScreen, isNowFullScreen) -> {
 //            if (wasFullScreen) {

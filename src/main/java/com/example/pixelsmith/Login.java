@@ -5,6 +5,7 @@ import javafx.geometry.HPos;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -69,6 +70,8 @@ public class Login extends Application {
 
         primaryStage.setScene(scene);
         primaryStage.setTitle("Login");
+        Image applicationIcon = new Image("icon.png");
+        primaryStage.getIcons().add(applicationIcon);
         primaryStage.show();
     }
 
@@ -102,7 +105,7 @@ public class Login extends Application {
         } catch (SQLException ex) {
             showAlert("Database Error", ex.getMessage());
         }
-        return null; // Return null if user ID not found or in case of an exception
+        return null;
     }
 
     private void showAlert(String title, String content) {

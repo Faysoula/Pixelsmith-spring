@@ -5,6 +5,7 @@ import javafx.geometry.HPos;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -86,15 +87,14 @@ public class SignUpApp extends Application {
             }
         });
 
-        HBox buttonLayout = new HBox(10); // Adjust spacing as needed
+        HBox buttonLayout = new HBox(10);
         buttonLayout.setAlignment(Pos.CENTER);
         buttonLayout.getChildren().addAll(signUpButton, loginButton);
 
-        VBox formLayout = new VBox(10); // Adjust the spacing if needed
+        VBox formLayout = new VBox(10);
         formLayout.setAlignment(Pos.CENTER);
         formLayout.getChildren().addAll(usernameField, emailField, passwordField,buttonLayout);
 
-// Add a title label that spans two columns
         Label titleLabel = new Label("PIXEL SMITH");
         GridPane.setHalignment(titleLabel, HPos.CENTER);
 
@@ -114,14 +114,13 @@ public class SignUpApp extends Application {
         passwordField.getStyleClass().add("text-field");
         signUpButton.getStyleClass().add("button");
 
-// Set the scene with the CSS file
         Scene scene = new Scene(grid, 300, 275);
         scene.getStylesheets().add("signup.css");
 
-
-// Set the scene
         primaryStage.setScene(scene);
         primaryStage.setTitle("Sign Up");
+        Image applicationIcon = new Image("icon.png");
+        primaryStage.getIcons().add(applicationIcon);
         primaryStage.show();
     }
 
