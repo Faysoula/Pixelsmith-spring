@@ -1,6 +1,7 @@
 package com.example.pixelsmith;
-
+// PixelArtEditor.java
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -8,21 +9,28 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.image.*;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.json.JSONObject;
+
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
 
-
 public class PixelArtEditor extends Application {
+    private static final String BASE_URL = "http://localhost:8080/api";
     private static int CANVAS_WIDTH = 2000;
     private static int CANVAS_HEIGHT = 2000;
     private static final int GRID_SIZE = 16;
@@ -32,11 +40,8 @@ public class PixelArtEditor extends Application {
     private GraphicsContext gc;
     private ColorPicker colorPicker;
     private Tool currentTool;
-
     private Integer currentSpriteId = null; // Null indicates a new sprite
     private String currentSpritePath = null; // Path to the saved sprite image
-
-
     private final int[] toolSizes = new int[]{1, 2, 3, 4};
 
     //external methods
@@ -46,10 +51,14 @@ public class PixelArtEditor extends Application {
         start(primaryStage);
         openSpriteForEditing(spriteId, pathToSprite);
     }
+
+
+
     // singleton
     private static PixelArtEditor instance;
 
-    private PixelArtEditor() {}
+    private PixelArtEditor() {
+    }
 
     public static PixelArtEditor getInstance() {
         if (instance == null) {
@@ -58,14 +67,9 @@ public class PixelArtEditor extends Application {
         return instance;
     }
 
-    /* sql stuff */
-    static Connection getDBConnection() throws SQLException {
-        return DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
-    }
-    //sprite save things
     private void saveCurrentSprite(Stage primaryStage) {
-        if (currentSpritePath == null) {
-            // First-time save (export)
+        Image spriteSheet = renderSpriteSheet();
+        if (currentSpriteId == null) {  // First-time save
             TextInputDialog dialog = new TextInputDialog("New Sprite");
             dialog.setTitle("Save Sprite");
             dialog.setHeaderText("Enter a name for your sprite:");
@@ -73,79 +77,121 @@ public class PixelArtEditor extends Application {
 
             Optional<String> result = dialog.showAndWait();
             result.ifPresent(spriteName -> {
-                Image spriteSheet = renderSpriteSheet();
-                currentSpritePath = saveSpriteSheet(spriteSheet, primaryStage);
-                if (currentSpritePath != null) {
-                    int userId = UserSession.getCurrentUserId(); // Get the current user ID
-                    createNewSprite(spriteName, userId, currentSpritePath);
+                String path = saveSpriteSheet(spriteSheet, primaryStage);
+                if (path != null) {
+                    currentSpritePath = path;
+                    int userId = UserSession.getCurrentUserId();
+                    createNewSprite(spriteName, userId, path);
                 }
             });
-        } else {
-            // Update existing sprite
-            Image spriteSheet = renderSpriteSheet();
-            saveUpdatedSpriteSheet(spriteSheet, currentSpritePath);
-            updateExistingSprite(currentSpriteId, currentSpritePath);
+        } else {  // Update existing sprite
+            updateExistingSprite(currentSpriteId, currentSpritePath, spriteSheet);
         }
     }
 
-    // Create a new sprite in the database
-    void createNewSprite(String spriteName, int userId, String pathToSprite) {
+    private String fetchSpriteNameById(Integer spriteId) {
+        String url = BASE_URL + "/sprites/" + spriteId + "/name";
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .build();
 
-        String insertSpriteQuery = "INSERT INTO Sprites (UserId, Name, CreationDate, LastModifiedDate) VALUES (?, ?, NOW(), NOW())";
-        String insertSpriteDataQuery = "INSERT INTO spritedata (SpriteID, PathDirect) VALUES (?, ?)";
-
-        try (Connection conn = getDBConnection();
-             PreparedStatement pstmt = conn.prepareStatement(insertSpriteQuery, Statement.RETURN_GENERATED_KEYS)) {
-
-
-            pstmt.setInt(1, userId);
-            pstmt.setString(2, spriteName);
-            pstmt.executeUpdate();
-
-            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    currentSpriteId = generatedKeys.getInt(1); // Save the generated sprite ID
-                    try (PreparedStatement pstmtData = conn.prepareStatement(insertSpriteDataQuery)) {
-                        pstmtData.setInt(1, currentSpriteId);
-                        pstmtData.setString(2, pathToSprite);
-                        pstmtData.executeUpdate();
-                    }
-                }
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return response.body(); // Returns the sprite name
+            } else {
+                System.err.println("Failed to fetch sprite name. Status: " + response.statusCode());
+                return null; // Handle error appropriately
             }
-        } catch (SQLException ex) {
-            System.out.println("error creating your sprite"); // Proper error handling should be implemented
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error fetching sprite name: " + e.getMessage());
+            return null; // Handle exception appropriately
         }
     }
 
-    private void updateExistingSprite(int spriteId, String pathToSprite) {
-        // Render the updated sprite sheet
-        Image updatedSpriteSheet = renderSpriteSheet();
-        // Save the updated sprite sheet to the existing file path
-        saveUpdatedSpriteSheet(updatedSpriteSheet, pathToSprite);
+    void createNewSprite(String spriteName, int userId, String pathToSprite) {
+        String url = "http://localhost:8080/api/sprites/create";
+        HttpClient client = HttpClient.newHttpClient();
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("name", spriteName);
+        JSONObject userObject = new JSONObject().put("userId", userId);
+        requestBody.put("user", userObject);
+        JSONObject spriteDataObject = new JSONObject().put("pathDirect", pathToSprite);
+        requestBody.put("spriteData", spriteDataObject);
 
-        String updateSpriteQuery = "UPDATE Sprites SET LastModifiedDate = NOW() WHERE SpriteID = ?";
-
-
-        try (Connection conn = getDBConnection();
-             PreparedStatement pstmt = conn.prepareStatement(updateSpriteQuery)) {
-
-            pstmt.setInt(1, spriteId);
-            pstmt.executeUpdate();
-
-        } catch (SQLException ex) {
-            System.out.println("error updating your sprite");
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                .build();
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("Response JSON: " + response.body());
+            if (response.statusCode() == 201) {
+                JSONObject jsonResponse = new JSONObject(response.body());
+                currentSpriteId = jsonResponse.getInt("spriteId");
+            } else {
+                System.err.println("Failed to create sprite. Server responded with status: " + response.statusCode());
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
+
+
+    private void updateExistingSprite(Integer spriteId, String pathDirect, Image spriteSheet) {
+        // Prompt user for the new sprite name
+        TextInputDialog dialog = new TextInputDialog(); // Default text is empty
+        dialog.setTitle("Update Sprite Name");
+        dialog.setHeaderText("Updated sprite name:");
+        dialog.setContentText("Name:");
+
+        Optional<String> result = dialog.showAndWait();
+        if (!result.isPresent() || result.get().trim().isEmpty()) {
+            System.out.println("Sprite update cancelled by user.");
+            return; // Exit if user cancels or submits empty name
+        }
+        String newSpriteName = result.get();
+
+        // Proceed with update
+        String url = BASE_URL + "/sprites/" + spriteId;
+        HttpClient client = HttpClient.newHttpClient();
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("spriteId", spriteId);
+        requestBody.put("name", newSpriteName);  // Use the new name provided by the user
+        requestBody.put("pathDirect", pathDirect);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                .build();
+        saveUpdatedSpriteSheet(spriteSheet, pathDirect);
+
+        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::statusCode)
+                .thenAccept(statusCode -> {
+                    if (statusCode == 200) {
+                        System.out.println("Sprite updated successfully.");
+                    } else {
+                        System.err.println("Failed to update sprite. Server responded with status: " + statusCode);
+                    }
+                })
+                .join(); // Note: Using join() is generally not recommended on the UI thread
+    }
+
+
+
 
     private void saveUpdatedSpriteSheet(Image spriteSheet, String filePath) {
         try {
-            // Save the updated image back to the original file
             ImageIO.write(SwingFXUtils.fromFXImage(spriteSheet, null), "png", new File(filePath));
         } catch (IOException e) {
             System.out.println("Error saving the updated sprite sheet: " + e.getMessage());
         }
     }
-
 
     private void openSpriteForEditing(int spriteId, String pathToSprite) {
         try {
@@ -182,6 +228,8 @@ public class PixelArtEditor extends Application {
             System.out.println("Error loading the sprite file: " + e.getMessage());
         }
     }
+
+
 
     // Tool interface
     interface Tool {
@@ -233,11 +281,10 @@ public class PixelArtEditor extends Application {
 
         // Finish drawing the square
         public void onMouseReleased(int row, int col) {
-
-
             // Calculate the square's boundaries
             int minX = Math.min(startX, col);
             int maxX = Math.max(startX, col);
+
             int minY = Math.min(startY, row);
             int maxY = Math.max(startY, row);
 
@@ -321,6 +368,7 @@ public class PixelArtEditor extends Application {
             return currentColor.equals(targetColor) || currentColor.equals(getCheckerboardColor(0, 0)) || currentColor.equals(getCheckerboardColor(0, 1));
         }
     }
+
     //line tool
     class LineTool implements Tool {
         private int startX, startY; // Starting coordinates
@@ -338,6 +386,7 @@ public class PixelArtEditor extends Application {
             }
         }
     }
+
     private void drawBresenhamLine(int x1, int y1, int x2, int y2) {
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
@@ -373,7 +422,7 @@ public class PixelArtEditor extends Application {
     // Initialize the grid with a checkerboard pattern
     private void initializeGrid() {
         for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLS; col++) {
+            for (int col = COLS - 1; col >= 0; col--) {
                 pixels[row][col] = getCheckerboardColor(row, col);
             }
         }
@@ -382,7 +431,7 @@ public class PixelArtEditor extends Application {
     // Render the grid based on the pixel data structure
     private void renderGrid() {
         for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLS; col++) {
+            for (int col = COLS - 1; col >= 0; col--) {
                 renderPixel(row, col);
             }
         }
@@ -399,7 +448,7 @@ public class PixelArtEditor extends Application {
         PixelWriter pixelWriter = spriteSheet.getPixelWriter();
 
         for (int row = 0; row < ROWS; row++) {
-            for (int col = 0; col < COLS; col++) {
+            for (int col = COLS - 1; col >= 0; col--) {
                 Color pixelColor = pixels[row][col];
                 // If the pixel color matches the checkerboard color, write black color
                 if (pixelColor.equals(getCheckerboardColor(row, col))) {
@@ -426,7 +475,6 @@ public class PixelArtEditor extends Application {
     void createNewSpriteEditor(String spriteName) {
         Stage newSpriteStage = new Stage();
         newSpriteStage.setTitle(spriteName);
-
         PixelArtEditor editor = new PixelArtEditor();
         CANVAS_HEIGHT = 2000;
         CANVAS_WIDTH = 2000;
@@ -454,7 +502,7 @@ public class PixelArtEditor extends Application {
 
             // Update the pixel array based on the loaded image
             for (int row = 0; row < spriteSheetRows; row++) {
-                for (int col = 0; col < spriteSheetCols; col++) {
+                for (int col = spriteSheetCols - 1; col >= 0; col--) {
                     // Read the color of the pixel
                     Color color = pixelReader.getColor(col, row);
 
@@ -488,14 +536,14 @@ public class PixelArtEditor extends Application {
 
         return null;
     }
-    private void clearCanvas(){
+
+    private void clearCanvas() {
         initializeGrid();
         renderGrid();
     }
 
     @Override
     public void start(Stage primaryStage) {
-
         initializeGrid();
         BorderPane root = new BorderPane();
         Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -569,9 +617,8 @@ public class PixelArtEditor extends Application {
 
         Button createSpriteButton = new Button();
         createSpriteButton.setOnAction(e -> {
-                createNewSpriteEditor("new sprite");
-            });
-
+            createNewSpriteEditor("new sprite");
+        });
 
         Slider sizeSlider = new Slider(0, toolSizes.length - 1, 0);
         sizeSlider.setMajorTickUnit(1);
@@ -600,7 +647,6 @@ public class PixelArtEditor extends Application {
             );
             File selectedFile = fileChooser.showOpenDialog(primaryStage);
             if (selectedFile != null) {
-
                 loadAndDisplaySpriteSheet(selectedFile);
             }
         });
@@ -644,9 +690,8 @@ public class PixelArtEditor extends Application {
         eyeDropperToolButton.setOnAction(e -> currentTool = new EyeDropperTool());
 
         // Add the tools to the toolbar
-        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton,colorPicker,sizeLabel, sizeSlider, squareToolButton,lineToolButton, createSpriteButton,
-                importSpriteButton, exportButton ,saveProgressButton,clearCanvasButton);
-
+        toolBar.getItems().addAll(penToolButton, eraserToolButton, fillToolButton, eyeDropperToolButton, colorPicker, sizeLabel, sizeSlider, squareToolButton,
+                lineToolButton, createSpriteButton, importSpriteButton, exportButton, saveProgressButton, clearCanvasButton);
 
         root.setTop(toolBar);
 
@@ -730,3 +775,4 @@ public class PixelArtEditor extends Application {
         launch(args);
     }
 }
+

@@ -1,11 +1,11 @@
 .root {
-    -fx-background-color: #333; /* Dark background for the whole application */
+    -fx-background-color: #333;
 }
 
 .button {
     -fx-background-color: #555; /* Darker buttons */
     -fx-text-fill: #eee; /* Light text color */
-    -fx-border-color: #666; /* Slightly lighter border for visibility */
+    -fx-border-color: #666; /* lighter border for visibility */
 }
 
 .label {
@@ -17,7 +17,7 @@
 }
 
 .canvas {
-    /* Styles for the canvas if necessary, you might not need to style this */
+    /*add later(im gonna forget)*/
 }
 
 .color-picker {
@@ -33,26 +33,31 @@
     -fx-background-color: #444;
 }
 .pen-tool-button, .ear-tool-button, .fill-tool-button, .square, .eye, .line,
-    .clear, .createnew, .save, .importimage, .exportimage{
+.clear, .createnew, .save, .importimage, .exportimage{
     -fx-background-position: center;
     -fx-background-repeat: no-repeat;
     -fx-background-color: transparent;
     -fx-text-fill: #ffffff;
     -fx-alignment: center;
-    -fx-padding: 10 10 10 10; /* Padding inside the button */ /* Margin for even spacing */
-    -fx-border: none; /* No border by default */
+    -fx-padding: 10 10 10 10; /* Padding inside the button */
+    -fx-border-color: none; /* No border by default */
+    -fx-border-width: 0; /* No border width */
+    -fx-border-style: none; /* No border style */
     -fx-min-width: 50px;
     -fx-min-height: 50px;
     -fx-max-width: 50px;
     -fx-max-height: 50px;
-    -fx-margin: 25px 5px;
+    -fx-margin: 25px 5px; /* This should be -fx-padding or another valid property if margin is intended */
 }
 
+/* Selected state */
 /* Selected state */
 .pen-tool-button:selected, .ear-tool-button:selected, .fill-tool-button:selected, .square:selected, .eye:selected,
 .line:selected, .clear:selected, .createnew:selected, .save:selected, .importimage:selected, .exportimage:selected{
     -fx-background-color: #FFC107; /* Background color change for visual effect */
-    -fx-border: 2px solid orange; /* Orange border to highlight the selected tool */
+    -fx-border-color: orange; /* Orange border to highlight the selected tool */
+    -fx-border-width: 2px; /* Border width */
+    -fx-border-style: solid; /* Border style */
 }
 
 /* Specific background images */

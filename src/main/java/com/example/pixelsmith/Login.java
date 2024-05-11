@@ -9,11 +9,16 @@ import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import org.mindrot.jbcrypt.BCrypt;
+import org.json.JSONObject;
 
-import java.sql.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Optional;
 
 public class Login extends Application {
+    private static final String BASE_URL = "http://localhost:8080/api";
 
     @Override
     public void start(Stage primaryStage) {
@@ -28,21 +33,16 @@ public class Login extends Application {
             String email = emailField.getText();
             String enteredPassword = passwordField.getText();
             try {
-                if (authenticate(email, enteredPassword)) {
-                    Integer userId = retrieveUserId(email);
-                    if (userId != null) {
-                        UserSession.setCurrentUserId(userId);
-                        int cuser = UserSession.getCurrentUserId();
-                        new SpriteSelector(cuser).start(new Stage());
-                        primaryStage.close();
-                    } else {
-                        showAlert("Login Failed", "User ID not found.");
-                    }
+                Optional<Integer> userId = authenticate(email, enteredPassword);
+                if (userId.isPresent()) {
+                    UserSession.setCurrentUserId(userId.get());
+                    new SpriteSelector(userId.get()).start(new Stage());
+                    primaryStage.close();
                 } else {
                     showAlert("Login Failed", "Invalid email or password.");
                 }
-            } catch (SQLException ex) {
-                showAlert("Database Error", ex.getMessage());
+            } catch (Exception ex) {
+                showAlert("Error", ex.getMessage());
             }
         });
 
@@ -75,37 +75,28 @@ public class Login extends Application {
         primaryStage.show();
     }
 
-    private boolean authenticate(String email, String password) throws SQLException {
-        Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith"
-                , "root", "13102004");
-        String query = "SELECT PasswordHash FROM users WHERE Email = ?";
-        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setString(1, email);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    String storedPasswordHash = rs.getString("PasswordHash");
-                    return BCrypt.checkpw(password, storedPasswordHash);
-                }
-            }
-        }
-        return false;
-    }
+    private Optional<Integer> authenticate(String email, String password) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        String url = BASE_URL + "/users/login";
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("email", email);
+        requestBody.put("passwordhash", password);  // Use "passwordhash" to align with server-side field
 
-    private Integer retrieveUserId(String email) {
-        String query = "SELECT UserId FROM users WHERE Email = ?";
-        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3307/pixelsmith", "root", "13102004");
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                .build();
 
-            pstmt.setString(1, email);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("UserId");
-                }
-            }
-        } catch (SQLException ex) {
-            showAlert("Database Error", ex.getMessage());
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Response JSON: " + response.body());
+
+        if (response.statusCode() == 200) {
+            JSONObject jsonResponse = new JSONObject(response.body());
+            return Optional.of(jsonResponse.getInt("userId"));
+        } else {
+            return Optional.empty();
         }
-        return null;
     }
 
     private void showAlert(String title, String content) {
